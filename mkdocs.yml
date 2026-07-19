@@ -1,5 +1,5 @@
 site_name: ガバメントAI「源内」非公式デプロイハンズオン資料
-site_description: 有志が作成する「源内」デプロイハンズオン資料。公式資料ではありません。
+site_description: 有志が非公式で作成する、ガバメントAI「源内」デプロイハンズオン資料です。公式資料ではありません。
 site_url: https://hide-G.github.io/gennai-unofficial-handson/
 
 theme:
