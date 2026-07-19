@@ -29,6 +29,7 @@ nav:
   - "このハンズオンの対象": audience.md
   - "事前準備（GitHubアカウント、AWSアカウント、必要ツール）": prerequisites.md
   - "AWSアカウントの注意（コスト、権限、リージョン、切り分け）": aws-notes.md
+  - "源内 Web（AI インターフェース）": web.md
   - "源内 AI アプリのデプロイ": deploy-ai-api.md
   - "動作確認": verify.md
   - "後片付け": cleanup.md

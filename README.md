@@ -68,6 +68,7 @@ Actionsは、GitHub公式のPages関連Actions（`configure-pages`、`upload-pag
 - このハンズオンの対象
 - 事前準備（GitHubアカウント、AWSアカウント、必要ツール）
 - AWSアカウントの注意（コスト、権限、リージョン、切り分け）
+- 源内 Web（AI インターフェース）
 - 源内 AI アプリのデプロイ
 - 動作確認
 - 後片付け
