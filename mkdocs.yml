@@ -24,7 +24,16 @@ theme:
         name: ライトモードに切り替え
 
 nav:
-  - 概要: index.md
+  - "ガバメントAI「源内」の概要": index.md
+  - "システムアーキテクチャの紹介": architecture.md
+  - "このハンズオンの対象": audience.md
+  - "事前準備（GitHubアカウント、AWSアカウント、必要ツール）": prerequisites.md
+  - "AWSアカウントの注意（コスト、権限、リージョン、切り分け）": aws-notes.md
+  - "源内 AI アプリのデプロイ": deploy-ai-api.md
+  - "動作確認": verify.md
+  - "後片付け": cleanup.md
+  - "想定質問集（FAQ）": faq.md
+  - "用語集・参考リンク": glossary.md
 
 plugins:
   - search
