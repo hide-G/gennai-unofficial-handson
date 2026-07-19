@@ -11,3 +11,8 @@
   --md-primary-fg-color--light: #ffad33;
   --md-primary-fg-color--dark: #cc7a00;
 }
+
+/* 画面表示時の本文幅を広げ、読みやすさを保つ */
+.md-grid {
+  max-width: 1440px;
+}
