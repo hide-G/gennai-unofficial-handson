@@ -1,0 +1,103 @@
+/* A4縦の印刷・PDF保存向けスタイル。通常の画面表示には影響しません。 */
+@page {
+  size: A4 portrait;
+  margin: 16mm 14mm 18mm;
+}
+
+@media print {
+  html {
+    font-size: 10pt;
+  }
+
+  body {
+    background: #fff;
+    color: #111;
+  }
+
+  /* 印刷時にサイト操作用のUIを隠す */
+  .md-header,
+  .md-sidebar,
+  .md-footer,
+  .md-search,
+  .md-tabs,
+  .md-top,
+  .md-content__button,
+  .md-feedback,
+  .md-social,
+  .md-nav__title,
+  .md-banner,
+  .md-consent,
+  .md-dialog,
+  .md-typeset .md-button {
+    display: none !important;
+  }
+
+  .md-main,
+  .md-main__inner,
+  .md-grid,
+  .md-content,
+  .md-content__inner {
+    display: block;
+    max-width: none;
+    width: auto;
+    margin: 0;
+    padding: 0;
+  }
+
+  .md-typeset {
+    font-size: 10pt;
+    line-height: 1.55;
+  }
+
+  .md-typeset h1,
+  .md-typeset h2,
+  .md-typeset h3,
+  .md-typeset h4 {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .md-typeset h1:not(:first-child) {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* print-site-pluginがまとめる各原稿をページ単位で開始する */
+  .print-page + .print-page {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .md-typeset table,
+  .md-typeset pre,
+  .md-typeset blockquote,
+  .admonition,
+  figure,
+  img {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .md-typeset pre {
+    overflow: visible;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border: 1px solid #bbb;
+    box-shadow: none;
+  }
+
+  .md-typeset code {
+    overflow-wrap: anywhere;
+  }
+
+  .md-typeset a {
+    color: inherit;
+    text-decoration: underline;
+  }
+
+  .md-typeset a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    overflow-wrap: anywhere;
+  }
+}

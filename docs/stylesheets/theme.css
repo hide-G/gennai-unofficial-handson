@@ -1,0 +1,13 @@
+:root {
+  /* AWS Orange */
+  --md-primary-fg-color: #ff9900;
+  --md-primary-fg-color--light: #ffad33;
+  --md-primary-fg-color--dark: #cc7a00;
+}
+
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #ff9900;
+  --md-primary-fg-color--light: #ffad33;
+  --md-primary-fg-color--dark: #cc7a00;
+}
