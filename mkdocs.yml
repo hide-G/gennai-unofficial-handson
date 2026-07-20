@@ -39,6 +39,11 @@ nav:
 
 plugins:
   - search
+  - enumerate-headings:
+      strict: true
+      toc_depth: 0
+      start_level: 1
+      increment_across_pages: true
   - print-site:
       add_to_navigation: true
       print_page_title: A4印刷 / PDF保存

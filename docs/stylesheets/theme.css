@@ -16,3 +16,20 @@
 .md-grid {
   max-width: 1440px;
 }
+
+/* mkdocs-enumerate-headings-plugin が生成する採番を薄く表示 */
+.md-typeset .enumerate-headings-plugin {
+  opacity: 0.55;
+  font-weight: normal;
+  margin-right: 0.35em;
+}
+
+/* H1 の「第N章 …」タイトルを尊重し、プラグインが挿入する章番号は非表示にする */
+.md-typeset h1 .enumerate-headings-plugin {
+  display: none;
+}
+
+/* 印刷用ページ（print-site-plugin）でも、H1 に付く自動採番の CSS プレフィックスを抑制する */
+.print-site-enumerate-headings section.print-page > h1::before {
+  content: none !important;
+}
