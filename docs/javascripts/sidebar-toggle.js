@@ -17,23 +17,11 @@
 (function () {
   var STORAGE_KEY = 'gennai-sidebar-collapsed';
   var BUTTON_CLASS = 'sidebar-toggle';
-  var LABEL_TEXT = '目次';
 
-  // Stroke-based double chevron. `«` — indicates "click to collapse the sidebar toward the left".
-  var CHEVRON_LEFT_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"' +
-    ' fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-    '<polyline points="13 7 8 12 13 17"></polyline>' +
-    '<polyline points="19 7 14 12 19 17"></polyline>' +
-    '</svg>';
-
-  // Stroke-based double chevron. `»` — indicates "click to expand the sidebar out to the right".
-  var CHEVRON_RIGHT_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"' +
-    ' fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
-    '<polyline points="11 7 16 12 11 17"></polyline>' +
-    '<polyline points="5 7 10 12 5 17"></polyline>' +
-    '</svg>';
+  // Text-only labels split across two lines for a compact header button.
+  var LABEL_TOP = '目次を';
+  var LABEL_ACTION_COLLAPSED = '表示';
+  var LABEL_ACTION_EXPANDED = '隠す';
 
   function safeGet(key) {
     try { return window.localStorage.getItem(key); } catch (e) { return null; }
@@ -48,11 +36,11 @@
   }
 
   function setButtonState(button, collapsed) {
+    var action = collapsed ? LABEL_ACTION_COLLAPSED : LABEL_ACTION_EXPANDED;
     button.innerHTML =
-      (collapsed ? CHEVRON_RIGHT_SVG : CHEVRON_LEFT_SVG) +
-      '<span class="sidebar-toggle__label">' + LABEL_TEXT + '</span>';
+      '<span class="sidebar-toggle__label">' + LABEL_TOP + '<br>' + action + '</span>';
     button.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-    var label = collapsed ? '目次を表示' : '目次を折りたたむ';
+    var label = LABEL_TOP + action;
     button.setAttribute('aria-label', label);
     button.setAttribute('title', label);
   }

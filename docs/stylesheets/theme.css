@@ -38,9 +38,9 @@
 .md-header .sidebar-toggle {
   display: none;
   align-items: center;
-  gap: 0.2rem;
+  justify-content: center;
   height: 2.4rem;
-  padding: 0 0.5rem;
+  padding: 0 0.45rem;
   border-radius: 0.2rem;
   cursor: pointer;
   color: currentColor;
@@ -57,17 +57,14 @@
   background-color: rgba(0, 0, 0, 0.12);
 }
 
+/* 2行組みの小さいラベル（例: 「目次を / 隠す」 「目次を / 表示」） */
 .md-header .sidebar-toggle__label {
-  font-size: 0.72rem;
+  font-size: 0.6rem;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.2;
+  text-align: center;
   letter-spacing: 0.02em;
-}
-
-/* SVG アイコンを継承色（ヘッダー前景色）で描画し、テキストと同じ濃さに揃える */
-.md-header .sidebar-toggle svg {
-  flex-shrink: 0;
-  color: currentColor;
+  white-space: normal;
 }
 
 @media screen and (min-width: 76.25em) {
