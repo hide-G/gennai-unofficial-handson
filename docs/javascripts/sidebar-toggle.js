@@ -17,19 +17,11 @@
 (function () {
   var STORAGE_KEY = 'gennai-sidebar-collapsed';
   var BUTTON_CLASS = 'sidebar-toggle';
-  var LABEL_TEXT = '目次';
 
-  // chevron-double-left: indicates "click to collapse the sidebar toward the left"
-  var CHEVRON_LEFT_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
-    '<path d="M18.41 16.59 13.83 12l4.58-4.59L17 6l-6 6 6 6zM12 6h-2v12h2z"></path>' +
-    '</svg>';
-
-  // chevron-double-right: indicates "click to expand the sidebar out to the right"
-  var CHEVRON_RIGHT_SVG =
-    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' +
-    '<path d="M5.59 7.41 10.17 12l-4.58 4.59L7 18l6-6-6-6zM14 6h-2v12h2z"></path>' +
-    '</svg>';
+  // Text-only labels split across two lines for a compact header button.
+  var LABEL_TOP = '目次を';
+  var LABEL_ACTION_COLLAPSED = '表示';
+  var LABEL_ACTION_EXPANDED = '隠す';
 
   function safeGet(key) {
     try { return window.localStorage.getItem(key); } catch (e) { return null; }
@@ -44,11 +36,11 @@
   }
 
   function setButtonState(button, collapsed) {
+    var action = collapsed ? LABEL_ACTION_COLLAPSED : LABEL_ACTION_EXPANDED;
     button.innerHTML =
-      (collapsed ? CHEVRON_RIGHT_SVG : CHEVRON_LEFT_SVG) +
-      '<span class="sidebar-toggle__label">' + LABEL_TEXT + '</span>';
+      '<span class="sidebar-toggle__label">' + LABEL_TOP + '<br>' + action + '</span>';
     button.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
-    var label = collapsed ? '目次を表示' : '目次を折りたたむ';
+    var label = LABEL_TOP + action;
     button.setAttribute('aria-label', label);
     button.setAttribute('title', label);
   }
