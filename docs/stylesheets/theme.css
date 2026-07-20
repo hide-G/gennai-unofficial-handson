@@ -33,3 +33,40 @@
 .print-site-enumerate-headings section.print-page > h1::before {
   content: none !important;
 }
+
+/* サイドバー折りたたみボタン（デスクトップ限定） */
+.md-header .sidebar-toggle {
+  display: none;
+}
+
+@media screen and (min-width: 76.25em) {
+  .md-header .sidebar-toggle {
+    display: inline-flex;
+  }
+
+  /* サイドバー本体をスムーズに左へスライドアウト */
+  .md-sidebar--primary {
+    transition: transform 0.25s ease, opacity 0.2s ease;
+  }
+
+  body.sidebar-collapsed .md-sidebar--primary {
+    transform: translateX(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* サイドバーが隠れた分、本文を左へ寄せて本文幅を広げる */
+  body.sidebar-collapsed .md-main__inner > .md-content {
+    margin-left: 0;
+  }
+
+  body.sidebar-collapsed .md-sidebar--primary + .md-content {
+    /* Material 側の負のマージン等で調整されるためのフォールバック */
+    max-width: none;
+  }
+}
+
+/* ボタンが押されている（＝サイドバーを折りたたんでいる）状態は背景を薄くしてトグル状態を示す */
+.md-header .sidebar-toggle[aria-pressed="true"] {
+  background-color: rgba(0, 0, 0, 0.1);
+}
