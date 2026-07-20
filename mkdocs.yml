@@ -8,6 +8,7 @@ theme:
   features:
     - navigation.sections
     - navigation.top
+    - navigation.footer
     - toc.integrate
     - search.highlight
     - search.suggest
@@ -63,3 +64,6 @@ markdown_extensions:
 extra_css:
   - stylesheets/theme.css
   - stylesheets/print.css
+
+extra_javascript:
+  - javascripts/sidebar-toggle.js
