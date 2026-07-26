@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>源内 × Amazon Bedrock ｜ デジタル主権ビジュアライザ（推論ルーティングと国境）</title>
+<style>
+/* =========================================================================
+   源内 × Amazon Bedrock デジタル主権ビジュアライザ
+   ダークテーマ + AWS グローバルインフラの地球儀を意識した配色
+   ========================================================================= */
+:root{
+  --bg:#070b18;
+  --bg2:#0c1226;
+  --panel:rgba(16,22,44,.82);
+  --panel-line:rgba(120,140,200,.18);
+  --text:#e8ecf7;
+  --text-dim:#96a0bd;
+  --aws-orange:#ff9900;
+  --aws-violet:#8c6bf0;
+  --aws-violet2:#5b4bd6;
+  --teal:#39d3d9;
+  --jp-green:#2fd97a;
+  --alert:#ff4d5e;
+  --warn:#ffc53d;
+  --radius:14px;
+  --mono:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,'BIZ UDGothic',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:radial-gradient(1200px 700px at 70% -10%,#1a2350 0%,var(--bg) 60%) fixed,var(--bg);
+  color:var(--text);
+  font-family:'Segoe UI','Hiragino Kaku Gothic ProN','Noto Sans JP','BIZ UDPGothic',Meiryo,sans-serif;
+  font-size:14px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--teal)}
+code,kbd{font-family:var(--mono)}
+
+/* ---------- ヘッダー ---------- */
+.topbar{
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  padding:10px 18px;border-bottom:1px solid var(--panel-line);
+  background:linear-gradient(180deg,rgba(10,15,34,.95),rgba(10,15,34,.6));
+  position:sticky;top:0;z-index:30;backdrop-filter:blur(8px);
+}
+.brand{display:flex;align-items:baseline;gap:12px;min-width:0}
+.brand h1{font-size:16px;margin:0;letter-spacing:.02em;white-space:nowrap}
+.brand .sub{font-size:11.5px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--aws-orange);box-shadow:0 0 12px var(--aws-orange);flex:0 0 auto}
+
+.playback{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.btn{
+  appearance:none;border:1px solid var(--panel-line);background:rgba(255,255,255,.05);
+  color:var(--text);border-radius:9px;padding:6px 12px;font-size:12.5px;cursor:pointer;
+  transition:.15s;font-family:inherit;white-space:nowrap;
+}
+.btn:hover{background:rgba(255,255,255,.12);border-color:rgba(160,180,255,.4)}
+.btn:focus-visible{outline:2px solid var(--aws-orange);outline-offset:2px}
+.btn.primary{background:linear-gradient(180deg,#ffab2e,#f08800);color:#1c1200;border-color:#ffb84d;font-weight:700}
+.btn.on{background:rgba(57,211,217,.18);border-color:var(--teal);color:#c9fbfd}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.speed{display:flex;border:1px solid var(--panel-line);border-radius:9px;overflow:hidden}
+.speed button{appearance:none;background:transparent;border:0;color:var(--text-dim);padding:6px 9px;font-size:12px;cursor:pointer;font-family:inherit}
+.speed button.on{background:rgba(140,107,240,.35);color:#fff}
+
+/* ---------- レイアウト ---------- */
+.layout{
+  display:grid;grid-template-columns:322px minmax(0,1fr) 336px;gap:12px;
+  padding:12px;align-items:stretch;min-height:calc(100vh - 52px);
+}
+@media (max-width:1250px){ .layout{grid-template-columns:300px minmax(0,1fr)} .right{grid-column:1/-1} }
+@media (max-width:900px){ .layout{grid-template-columns:1fr} }
+
+.panel{
+  background:var(--panel);border:1px solid var(--panel-line);border-radius:var(--radius);
+  padding:12px;display:flex;flex-direction:column;gap:12px;
+  max-height:calc(100vh - 76px);overflow-y:auto;backdrop-filter:blur(6px);
+}
+.panel::-webkit-scrollbar{width:9px}
+.panel::-webkit-scrollbar-thumb{background:rgba(140,160,220,.25);border-radius:9px}
+.sec{border-top:1px solid var(--panel-line);padding-top:10px}
+.sec:first-child{border-top:0;padding-top:0}
+.sec h2{
+  font-size:11px;letter-spacing:.14em;color:var(--text-dim);margin:0 0 8px;
+  text-transform:uppercase;display:flex;align-items:center;gap:7px;
+}
+.sec h2 .n{
+  width:18px;height:18px;border-radius:50%;background:rgba(255,153,0,.16);
+  color:var(--aws-orange);display:grid;place-items:center;font-size:11px;letter-spacing:0;flex:0 0 auto;
+}
+
+/* ---------- ソースリージョン ---------- */
+.srcbox{
+  display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;
+  background:linear-gradient(90deg,rgba(47,217,122,.14),rgba(47,217,122,.03));
+  border:1px solid rgba(47,217,122,.3);
+}
+.srcbox .flag{font-size:20px}
+.srcbox b{font-size:13.5px}
+.srcbox .rc{font-family:var(--mono);font-size:11px;color:var(--jp-green)}
+
+/* ---------- モデル一覧 ---------- */
+.models{display:flex;flex-direction:column;gap:6px}
+.mcard{
+  display:block;border:1px solid var(--panel-line);border-radius:11px;padding:8px 10px;
+  cursor:pointer;transition:.15s;background:rgba(255,255,255,.02);position:relative;
+}
+.mcard:hover{background:rgba(255,255,255,.07)}
+.mcard.on{border-color:var(--aws-orange);background:rgba(255,153,0,.1);box-shadow:0 0 0 1px rgba(255,153,0,.3) inset}
+.mcard input{position:absolute;opacity:0;pointer-events:none}
+.mcard:focus-within{outline:2px solid var(--aws-orange);outline-offset:2px}
+.mrow{display:flex;align-items:center;gap:8px}
+.mname{font-weight:700;font-size:13px}
+.mvendor{font-size:10.5px;color:var(--text-dim);margin-left:auto;white-space:nowrap}
+.mtags{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.tag{font-size:9.5px;padding:1.5px 6px;border-radius:20px;border:1px solid;letter-spacing:.03em;font-family:var(--mono)}
+.tag.t-inRegion{color:#9ff2c4;border-color:rgba(47,217,122,.5);background:rgba(47,217,122,.12)}
+.tag.t-jp{color:#9ff2c4;border-color:rgba(47,217,122,.5);background:rgba(47,217,122,.12)}
+.tag.t-apac{color:#ffd88a;border-color:rgba(255,197,61,.5);background:rgba(255,197,61,.1)}
+.tag.t-global{color:#ffb3bb;border-color:rgba(255,77,94,.5);background:rgba(255,77,94,.1)}
+.badge-gennai{
+  font-size:9.5px;padding:1.5px 6px;border-radius:20px;
+  background:rgba(140,107,240,.22);border:1px solid rgba(160,130,255,.5);color:#d6c9ff;
+}
+
+/* ---------- スコープ選択 ---------- */
+.scopes{display:flex;flex-direction:column;gap:6px}
+.scope{
+  display:grid;grid-template-columns:26px 1fr auto;gap:9px;align-items:center;
+  border:1px solid var(--panel-line);border-radius:11px;padding:8px 10px;cursor:pointer;
+  background:rgba(255,255,255,.02);transition:.15s;position:relative;
+}
+.scope:hover:not(.na){background:rgba(255,255,255,.07)}
+.scope input{position:absolute;opacity:0;pointer-events:none}
+.scope:focus-within{outline:2px solid var(--aws-orange);outline-offset:2px}
+.scope .ico{font-size:17px;text-align:center}
+.scope .t1{font-size:12.5px;font-weight:700;line-height:1.35}
+.scope .t2{font-size:10.5px;color:var(--text-dim);font-family:var(--mono)}
+.scope .vd{font-size:16px}
+.scope.on{background:rgba(140,107,240,.16);border-color:var(--aws-violet)}
+.scope.on.good{background:rgba(47,217,122,.14);border-color:var(--jp-green)}
+.scope.on.bad{background:rgba(255,77,94,.13);border-color:var(--alert)}
+.scope.na{opacity:.34;cursor:not-allowed}
+.scope .na-note{grid-column:1/-1;font-size:10px;color:var(--warn)}
+
+/* ---------- modelId 表示 ---------- */
+.idbox{
+  border:1px solid var(--panel-line);border-radius:11px;overflow:hidden;background:rgba(0,0,0,.35);
+}
+.idbox .head{display:flex;align-items:center;gap:8px;padding:5px 9px;background:rgba(255,255,255,.04);font-size:10.5px;color:var(--text-dim)}
+.idbox .body{padding:10px;font-family:var(--mono);font-size:12.5px;word-break:break-all;line-height:1.5}
+.idbox .pfx{color:var(--aws-orange);font-weight:700;background:rgba(255,153,0,.14);padding:1px 3px;border-radius:4px}
+.idbox .pfx.jp{color:var(--jp-green);background:rgba(47,217,122,.14)}
+.idbox .pfx.bad{color:var(--alert);background:rgba(255,77,94,.14)}
+
+/* ---------- 判定 ---------- */
+.verdict{border-radius:12px;padding:11px;border:1px solid;display:flex;flex-direction:column;gap:8px}
+.verdict.good{background:linear-gradient(160deg,rgba(47,217,122,.18),rgba(47,217,122,.04));border-color:rgba(47,217,122,.45)}
+.verdict.bad{background:linear-gradient(160deg,rgba(255,77,94,.18),rgba(255,77,94,.04));border-color:rgba(255,77,94,.45)}
+.verdict .vhead{display:flex;align-items:center;gap:9px}
+.verdict .vmark{font-size:26px;line-height:1}
+.verdict .vtitle{font-weight:800;font-size:14px}
+.verdict .vdesc{font-size:11.5px;color:#dfe5f5}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:11.5px}
+.kv dt{color:var(--text-dim);white-space:nowrap}
+.kv dd{margin:0;font-family:var(--mono);font-size:11px}
+
+/* ---------- ステージ（地球儀） ---------- */
+.stage{
+  position:relative;border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--panel-line);background:radial-gradient(700px 520px at 50% 42%,#141c42 0%,#080c1c 70%);
+  min-height:520px;
+}
+#globe{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#globe:active{cursor:grabbing}
+.hud{position:absolute;inset:0;pointer-events:none;padding:12px;display:flex;flex-direction:column;gap:8px}
+.hud .row{display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.chip{
+  pointer-events:auto;background:rgba(8,12,28,.72);border:1px solid var(--panel-line);
+  border-radius:10px;padding:5px 10px;font-size:11.5px;backdrop-filter:blur(6px);
+  max-width:min(52ch,100%);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.chip b{font-family:var(--mono)}
+.chip.alert{border-color:var(--alert);background:rgba(90,10,20,.78);color:#ffd7db}
+.chip.ok{border-color:rgba(47,217,122,.5);background:rgba(8,40,24,.72);color:#c7f7dc}
+.spacer{flex:1}
+.viewctl{display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto}
+.legend{
+  pointer-events:auto;align-self:flex-start;background:rgba(8,12,28,.72);border:1px solid var(--panel-line);
+  border-radius:10px;padding:8px 10px;font-size:11px;display:flex;flex-direction:column;gap:4px;backdrop-filter:blur(6px);
+}
+.legend .li{display:flex;align-items:center;gap:7px;color:#c7cfe6}
+.legend .sw{width:11px;height:11px;border-radius:50%;flex:0 0 auto}
+.crossbanner{
+  position:absolute;left:50%;top:16px;transform:translateX(-50%) translateY(-140%);
+  background:linear-gradient(90deg,#8c1020,#c31e33);border:1px solid #ff8b98;color:#fff;
+  padding:7px 16px;border-radius:999px;font-weight:800;font-size:13px;letter-spacing:.03em;
+  box-shadow:0 8px 30px rgba(255,60,80,.45);transition:transform .35s cubic-bezier(.2,1.4,.4,1),opacity .35s;opacity:0;
+}
+.crossbanner.show{transform:translateX(-50%) translateY(0);opacity:1}
+.scrub{position:absolute;left:12px;right:12px;bottom:10px;pointer-events:auto}
+.scrub .track{height:6px;border-radius:6px;background:rgba(255,255,255,.12);position:relative;cursor:pointer}
+.scrub .fill{position:absolute;left:0;top:0;bottom:0;border-radius:6px;background:linear-gradient(90deg,var(--aws-violet),var(--aws-orange))}
+.scrub .marks{position:absolute;left:0;right:0;top:-3px;height:12px}
+.scrub .mk{position:absolute;width:2px;height:12px;background:rgba(255,255,255,.28);border-radius:2px}
+.scrub .tl{display:flex;justify-content:space-between;font-size:10px;color:var(--text-dim);margin-top:3px;font-family:var(--mono)}
+
+/* ---------- 右パネル：ステップ / ログ ---------- */
+.steps{display:flex;flex-direction:column;gap:4px}
+.step{
+  display:grid;grid-template-columns:22px 1fr;gap:8px;padding:6px 8px;border-radius:9px;
+  border:1px solid transparent;font-size:12px;transition:.2s;
+}
+.step .num{
+  width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;
+  background:rgba(255,255,255,.07);color:var(--text-dim);font-family:var(--mono);
+}
+.step .st1{font-weight:600;line-height:1.4}
+.step .st2{font-size:10.5px;color:var(--text-dim);font-family:var(--mono);word-break:break-all}
+.step.done{opacity:.55}
+.step.done .num{background:rgba(47,217,122,.2);color:var(--jp-green)}
+.step.act{background:rgba(140,107,240,.16);border-color:var(--aws-violet)}
+.step.act .num{background:var(--aws-violet);color:#fff}
+.step.act.cross{background:rgba(255,77,94,.16);border-color:var(--alert)}
+.step.act.cross .num{background:var(--alert)}
+
+.logbox{
+  background:#04060f;border:1px solid var(--panel-line);border-radius:10px;padding:8px;
+  font-family:var(--mono);font-size:10.5px;height:172px;overflow-y:auto;line-height:1.55;
+}
+.logbox .ln{display:flex;gap:6px;border-bottom:1px dashed rgba(255,255,255,.06);padding:2px 0}
+.logbox .t{color:#5f6b8c;flex:0 0 auto}
+.logbox .r{font-weight:700}
+.logbox .r.jp{color:var(--jp-green)}
+.logbox .r.out{color:var(--alert)}
+.logbox .m{color:#8d97b5;flex:1;text-align:right}
+.dist{display:flex;flex-direction:column;gap:3px;font-size:11px}
+.dist .d{display:grid;grid-template-columns:112px 1fr 34px;gap:7px;align-items:center}
+.dist .nm{font-family:var(--mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dist .bar{height:7px;border-radius:6px;background:rgba(255,255,255,.09);overflow:hidden}
+.dist .bar i{display:block;height:100%;border-radius:6px;background:var(--jp-green);transition:width .3s}
+.dist .bar i.out{background:var(--alert)}
+.dist .ct{text-align:right;font-family:var(--mono);font-size:10px;color:var(--text-dim)}
+
+/* ---------- 解説（下部） ---------- */
+.docs{padding:6px 18px 60px;max-width:1180px;margin:0 auto}
+.docs h2{font-size:17px;margin:26px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--panel-line)}
+.docs h3{font-size:14px;margin:18px 0 6px;color:#cfd7ee}
+.docs p,.docs li{font-size:13px;color:#c3cbe2}
+.cmp{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0;display:block;overflow-x:auto;white-space:nowrap}
+.cmp th,.cmp td{border:1px solid var(--panel-line);padding:7px 9px;text-align:left;vertical-align:top}
+.cmp th{background:rgba(255,255,255,.05);font-size:11.5px;color:#dfe5f5}
+.cmp td.ok{background:rgba(47,217,122,.09)}
+.cmp td.ng{background:rgba(255,77,94,.09)}
+.cmp code{font-size:11px}
+pre{
+  background:#04060f;border:1px solid var(--panel-line);border-radius:10px;padding:11px;
+  overflow-x:auto;font-size:11.5px;line-height:1.55;
+}
+.note{border-left:3px solid var(--aws-orange);background:rgba(255,153,0,.07);padding:9px 12px;border-radius:0 9px 9px 0;margin:10px 0}
+.note.warn{border-color:var(--alert);background:rgba(255,77,94,.08)}
+.src{font-size:11.5px;color:var(--text-dim)}
+footer{border-top:1px solid var(--panel-line);padding:16px 18px 40px;color:var(--text-dim);font-size:11.5px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:reduce){ .crossbanner{transition:none} }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="dot" aria-hidden="true"></span>
+    <h1>源内 × Amazon Bedrock ｜ デジタル主権ビジュアライザ</h1>
+    <span class="sub">どの生成AIを選び、どの modelId を指定すれば「日本国内に閉じる」のかを地球儀で確かめる</span>
+  </div>
+  <div class="playback">
+    <button class="btn primary" id="btnPlay" aria-label="再生／一時停止">⏸ 一時停止</button>
+    <button class="btn" id="btnReset" aria-label="最初から">↺ 最初から</button>
+    <div class="speed" role="group" aria-label="再生速度">
+      <button data-sp="0.5">0.5x</button><button data-sp="1" class="on">1x</button><button data-sp="2">2x</button><button data-sp="4">4x</button>
+    </div>
+    <button class="btn on" id="btnLoop" aria-pressed="true">🔁 ループ</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ 左：設定パネル ============ -->
+  <aside class="panel left">
+    <div class="sec">
+      <h2>ソースリージョン（源内の実行環境）</h2>
+      <div class="srcbox">
+        <span class="flag" aria-hidden="true">🇯🇵</span>
+        <div>
+          <b>アジアパシフィック（東京）</b><br>
+          <span class="rc">ap-northeast-1</span>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--text-dim);margin:7px 0 0">
+        API を呼び出すリージョン。源内Web の <code>modelRegion</code> は <code>ap-northeast-1</code>。
+        CloudWatch / CloudTrail のログもここに残る。
+      </p>
+    </div>
+
+    <div class="sec">
+      <h2><span class="n">1</span>生成AIモデルを選ぶ</h2>
+      <div class="models" id="models" role="radiogroup" aria-label="生成AIモデル"></div>
+    </div>
+
+    <div class="sec">
+      <h2><span class="n">2</span>推論スコープを選ぶ</h2>
+      <div class="scopes" id="scopes" role="radiogroup" aria-label="推論スコープ"></div>
+    </div>
+
+    <div class="sec">
+      <h2><span class="n">3</span>アプリが指定する modelId</h2>
+      <div class="idbox">
+        <div class="head"><span>modelId / inferenceProfileId</span>
+          <button class="btn" id="btnCopy" style="margin-left:auto;padding:2px 8px;font-size:10.5px">コピー</button>
+        </div>
+        <div class="body" id="modelIdOut"></div>
+      </div>
+      <p style="font-size:11px;color:var(--text-dim);margin:7px 0 0" id="idHint"></p>
+    </div>
+
+    <div class="sec">
+      <h2>判定</h2>
+      <div class="verdict" id="verdict" aria-live="polite"></div>
+    </div>
+  </aside>
+
+  <!-- ============ 中央：地球儀 ============ -->
+  <section class="stage" id="stage">
+    <canvas id="globe" role="img" aria-label="地球儀上の推論ルーティング図"></canvas>
+    <div class="hud">
+      <div class="row">
+        <div class="chip" id="chipScope">—</div>
+        <div class="chip" id="chipDest">宛先候補 —</div>
+        <div class="chip" id="chipCross">越境 0 件</div>
+        <div class="spacer"></div>
+        <div class="viewctl">
+          <button class="btn" id="btnJp">🇯🇵 日本中心</button>
+          <button class="btn" id="btnWorld">🌐 全球</button>
+          <button class="btn on" id="btnSpin">⟳ 自動回転</button>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <div class="legend" aria-hidden="true">
+        <div class="li"><span class="sw" style="background:#2fd97a"></span>日本国内リージョン（東京・大阪）</div>
+        <div class="li"><span class="sw" style="background:#ff4d5e"></span>国外リージョン（越境先）</div>
+        <div class="li"><span class="sw" style="background:#ff9900"></span>推論リクエスト／レスポンス</div>
+        <div class="li"><span class="sw" style="background:rgba(47,217,122,.45);border:1px solid #2fd97a"></span>日本国内ゾーン（模式的な境界）</div>
+      </div>
+    </div>
+    <div class="crossbanner" id="crossBanner" role="status">⚠ 国境を越えました</div>
+    <div class="scrub">
+      <div class="track" id="track" role="slider" tabindex="0" aria-label="タイムライン" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="fill" id="fill"></div>
+        <div class="marks" id="marks"></div>
+      </div>
+      <div class="tl"><span id="tlNow">0.0s</span><span id="tlPhase">—</span><span id="tlTotal">10.0s</span></div>
+    </div>
+  </section>
+
+  <!-- ============ 右：フローとログ ============ -->
+  <aside class="panel right">
+    <div class="sec">
+      <h2>推論フロー</h2>
+      <div class="steps" id="steps"></div>
+    </div>
+    <div class="sec">
+      <h2>推論が着地したリージョン</h2>
+      <div class="dist" id="dist"></div>
+    </div>
+    <div class="sec">
+      <h2>CloudTrail 風ログ（additionalEventData）</h2>
+      <div class="logbox" id="log" aria-live="off"></div>
+      <p style="font-size:10.5px;color:var(--text-dim);margin:6px 0 0">
+        CloudTrail は<b>ソースリージョンにのみ</b>記録され、<code>inferenceRegion</code> で実際の処理先が分かる。
+      </p>
+    </div>
+  </aside>
+</main>
+
+<!-- ============ 解説 ============ -->
+<div class="docs">
+  <h2>1. なぜ modelId ひとつでデジタル主権が変わるのか</h2>
+  <p>
+    Amazon Bedrock で <code>InvokeModel</code> / <code>Converse</code> を呼ぶとき、アプリが渡す文字列は 2 種類あります。
+    <b>基盤モデル ID</b>（プレフィックスなし）と、<b>推論プロファイル ID</b>（<code>jp.</code> / <code>apac.</code> / <code>us.</code> / <code>eu.</code> / <code>global.</code> 付き）です。
+    推論プロファイルは「モデル」＋「ルーティング先リージョンの集合」を定義したリソースなので、
+    <b>プレフィックスがそのまま “データが処理される地理的範囲” を決めます</b>。
+  </p>
+  <div class="note">
+    ソースリージョン＝API を呼ぶリージョン（源内は東京）。デスティネーションリージョン＝Bedrock が推論を回す先。
+    ログ・ナレッジベース・設定などの保存データはソースリージョンに留まりますが、<b>推論の演算そのものは宛先リージョンで起きます</b>。
+    ここが「国内に閉じるか」の分岐点です。
+  </div>
+
+  <h2>2. 4 つの選択肢の比較</h2>
+  <table class="cmp">
+    <thead><tr><th>選択肢</th><th>modelId の形</th><th>宛先リージョン</th><th>国内完結</th><th>向いているケース</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>リージョン内推論</b></td><td><code>anthropic.claude-3-5-sonnet-…</code><br><code>amazon.nova-lite-v1:0</code></td>
+        <td>東京のみ（1）</td><td class="ok">◎ 完全に東京だけ</td>
+        <td>処理場所を 1 リージョンに固定したい。ただし対応モデルが限られ、バースト耐性は最も低い</td>
+      </tr>
+      <tr>
+        <td><b>日本国内 CRIS</b></td><td><code>jp.</code> + モデル名</td>
+        <td>東京・大阪（2）</td><td class="ok">◎ 日本国内で完結</td>
+        <td>データレジデンシー要件がありつつ最新モデルとスループットも欲しい。<b>政府・金融・医療の第一候補</b></td>
+      </tr>
+      <tr>
+        <td><b>APAC 地理 CRIS</b></td><td><code>apac.</code> + モデル名</td>
+        <td>日本＋韓国・インド・シンガポール・オーストラリア（最大 8）</td><td class="ng">✕ 国外へ出る</td>
+        <td>アジア広域サービスでレイテンシとスループットを優先。国内限定要件とは両立しない</td>
+      </tr>
+      <tr>
+        <td><b>グローバル CRIS</b></td><td><code>global.</code> + モデル名</td>
+        <td>サポートされる全ての商用リージョン</td><td class="ng">✕ 世界中に分散</td>
+        <td>データレジデンシー要件がなく、最大スループットと最安価格を取りたい</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="src">
+    宛先リージョンの実データは本ワークスペースの AWS アカウント（東京リージョン）で
+    <code>bedrock list-inference-profiles</code> を実行して取得した実測値です。
+  </p>
+
+  <h2>3. 源内での設定箇所</h2>
+  <p>源内は modelId を設定として外部化しているため、主権の境界は「コード」ではなく「設定」で決まります。</p>
+  <pre><code>// 源内Web（GenU 派生）: packages/cdk/cdk.json
+"modelRegion": "ap-northeast-1",
+"modelIds": [
+  "jp.anthropic.claude-sonnet-4-6",                    // 東京・大阪に閉じる
+  "amazon.nova-lite-v1:0",                             // 東京のみ（リージョン内）
+  "jp.anthropic.claude-haiku-4-5-20251001-v1:0",       // 東京・大阪に閉じる
+  "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"       // 東京・大阪に閉じる
+]
+
+// 行政実務用 AI アプリ（query-expansion-rag）: config/apps/*.toml
+modelId = "jp.anthropic.claude-sonnet-4-5-20250929-v1:0"</code></pre>
+  <div class="note warn">
+    ここを <code>global.</code> や <code>apac.</code> に書き換えた瞬間、コード変更ゼロで推論が国外に出ます。
+    逆に言えば、<b>レビュー対象は modelId の 1 行</b>です。
+  </div>
+
+  <h2>4. 「国内に閉じる」を仕組みで担保する 4 点セット</h2>
+  <h3>① modelId を <code>jp.</code>（またはプレフィックスなし）に限定する</h3>
+  <p>アプリの設定・許可リストで <code>global.</code> / <code>apac.</code> / <code>us.</code> / <code>eu.</code> を使わせない。</p>
+  <h3>② IAM で宛先リージョンを明示的に列挙する</h3>
+  <p>推論プロファイル ARN と、<b>各宛先リージョンの基盤モデル ARN</b> の両方が必要です。国内 2 リージョンだけを書くことで、意図が Resource に現れます。</p>
+  <pre><code>{
+  "Effect": "Allow",
+  "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+  "Resource": [
+    "arn:aws:bedrock:ap-northeast-1:123456789012:inference-profile/jp.anthropic.claude-sonnet-4-6",
+    "arn:aws:bedrock:ap-northeast-1::foundation-model/anthropic.claude-sonnet-4-6",
+    "arn:aws:bedrock:ap-northeast-3::foundation-model/anthropic.claude-sonnet-4-6"
+  ]
+}</code></pre>
+  <h3>③ SCP でリージョンそのものを制限する</h3>
+  <p>組織レベルで東京・大阪以外の Bedrock 呼び出しを拒否すれば、誤って <code>global.</code> を指定しても宛先が塞がれて失敗します（＝越境しない）。</p>
+  <h3>④ CloudTrail の <code>inferenceRegion</code> で事後検証する</h3>
+  <p><code>additionalEventData.inferenceRegion</code> に実際の処理リージョンが記録されます。国内 2 リージョン以外が出ていないかを継続的に監査できます。</p>
+
+  <h2>5. トレードオフ</h2>
+  <ul>
+    <li><b>料金</b>：日本国内 CRIS はグローバル分散に対して <b>+10%</b>（US / EU / オーストラリアの地理プロファイルも同様）。</li>
+    <li><b>モデルの選択肢</b>：<code>jp.</code> があるモデルは限定的。最新の一部モデルは <code>global.</code> のみ。</li>
+    <li><b>スループット</b>：宛先が 2 リージョンなので、全世界に分散するグローバル CRIS よりバースト耐性は下がる。クォータ増加はソースリージョン（東京 / 大阪）で申請。</li>
+    <li><b>opt-in リージョン</b>：グローバル / 地理プロファイルの宛先には、アカウントで有効化していない opt-in リージョンが含まれ得る点に注意。</li>
+  </ul>
+
+  <h2>6. 出典</h2>
+  <ul class="src">
+    <li><a href="https://aws.amazon.com/jp/blogs/news/amazon-bedrock-now-supports-japan-cross-region-inference/" target="_blank" rel="noopener">Amazon Bedrock で日本国内に閉じた Anthropic Claude 4.5 の推論が可能に！日本国内クロスリージョン推論のご紹介（AWS 公式ブログ）</a></li>
+    <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/inference-profiles-support.html" target="_blank" rel="noopener">Supported Regions and models for inference profiles（Amazon Bedrock ユーザーガイド）</a></li>
+    <li><a href="https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html" target="_blank" rel="noopener">Increase throughput with cross-Region inference（同ユーザーガイド）</a></li>
+    <li><a href="https://aws.amazon.com/blogs/machine-learning/securing-amazon-bedrock-cross-region-inference-geographic-and-global/" target="_blank" rel="noopener">Securing Amazon Bedrock cross-Region inference: Geographic and global（AWS 公式ブログ）</a></li>
+    <li>推論プロファイル ID と宛先リージョン：本ワークスペースの AWS アカウント（ap-northeast-1）での <code>bedrock list-inference-profiles</code> 実測</li>
+    <li>源内の設定箇所：<code>源内_Claude_Opus_4.8_導入技術調査報告書.md</code>（同ワークスペース内の既存調査）</li>
+  </ul>
+  <p class="src">※ 出典の文章は引用ではなく要約・言い換えです（ライセンス遵守）。地形データは Natural Earth（パブリックドメイン, 1:110m）を簡略化して埋め込んでいます。</p>
+</div>
+
+<footer>
+  源内 × Amazon Bedrock デジタル主権ビジュアライザ ／ 地球儀・アニメーションは Canvas 2D 実装、外部ライブラリなしの単一 HTML です。
+</footer>
+
+<div class="sr" id="srLive" aria-live="polite"></div>
+
+<script>
+"use strict";
+/* =======================================================================
+   0. 地形データ（Natural Earth 1:110m を簡略化して埋め込み）
+      tools/build-geo.mjs が下のマーカー間を書き換えます。
+   ======================================================================= */
+const GEO = /*GEO_START*/{"w":[[34,-1,37.5,-3,38,-3.5,39,-4.5,38.5,-6,39,-6.5,39.5,-7,39,-7.5,39.5,-8,39,-8.5,39.5,-9,40,-10,40.5,-10.5,39.5,-11,38.5,-11.5,38,-11.5,37.5,-11.5,37,-11.5,36.5,-11.5,35.5,-11.5,34.5,-11.5,34.5,-10,34,-9.5,33.5,-9.5,33,-9,32,-9,31.5,-9,31,-8.5,30.5,-8.5,30,-7,29.5,-6.5,29.5,-6,29.5,-5.5,29.5,-4.5,30,-4.5,30,-4,30.5,-3.5,31,-3.5,30.5,-3,30.5,-2.5,31,-2.5,31,-1.5,30.5,-1,31,-1,32,-1,34,-1],[-8.5,27.5,-8.5,26,-12,26,-12,23.5,-13,23.5,-13,23,-13,21.5,-17,21.5,-17,21,-17,21.5,-15,21.5,-14.5,22,-14,22.5,-14,23.5,-12.5,25,-12,26,-11.5,26,-11.5,27,-10.5,27,-10,27,-9.5,27,-9,27,-9,27.5,-8.5,27.5],[-123,49,-125,50,-125.5,50.5,-127.5,51,-128,51.5,-128,52.5,-129,53,-129.5,53.5,-130.5,54.5,-130.5,55,-130,55.5,-130,56,-131.5,56.5,-132.5,57.5,-133.5,58.5,-134.5,59,-135,59.5,-135.5,60,-136.5,59.5,-137.5,59,-138.5,59.5,-139,60,-140,60.5,-141,60.5,-141,66,-141,69.5,-139,69.5,-137.5,69,-136.5,69,-135.5,69.5,-134.5,69.5,-133,69.5,-131.5,70,-130,70,-129,70,-128.5,70,-128,70.5,-127.5,70.5,-126,69.5,-124.5,70,-124.5,69.5,-123,69.5,-122.5,70,-121.5,70,-120,69.5,-117.5,69,-116,69,-115,69,-114,68.5,-115.5,68,-113.5,67.5,-111,68,-110,68,-109,67.5,-108,68,-109,68.5,-108,68.5,-107,68.5,-106,69,-105.5,68.5,-104.5,68,-103,68,-101.5,67.5,-100,68,-98.5,68,-98.5,68.5,-97.5,68.5,-96,68,-96,67.5,-95.5,68,-94.5,68,-94,69,-95.5,69.5,-96.5,70,-96.5,71,-95,72,-94,72,-93,71.5,-91.5,70,-92.5,69.5,-90.5,69.5,-90.5,68.5,-89,69.5,-88,68.5,-88.5,68,-87.5,67,-86.5,68,-85.5,69,-85.5,70,-84,70,-82.5,69.5,-81.5,69,-81,68.5,-82,68,-81.5,67.5,-81.5,67,-83.5,66.5,-84.5,66.5,-86,66.5,-86,66,-87,65,-87.5,65,-88.5,64,-90,64,-90.5,63.5,-91,63,-92,63,-93,62,-94,61,-94.5,60,-94.5,59,-93,59,-93,58,-92.5,57,-91,57.5,-89,57,-88,56.5,-87.5,56,-86,55.5,-85,55.5,-83.5,55,-82.5,55,-82.5,54.5,-82,53.5,-81.5,52,-80,51,-79,51.5,-78.5,52.5,-79,54,-80,54.5,-78,55,-77,56,-76.5,56.5,-76.5,57,-77.5,58,-78.5,59,-77.5,60,-78,61,-78,62.5,-77.5,62.5,-75.5,62.5,-74.5,62,-74,62.5,-73,62,-71.5,61.5,-71.5,61,-69.5,61,-69.5,60,-69.5,59,-68.5,59,-67.5,58,-66,59,-65,60,-64.5,60.5,-64,59.5,-62.5,58,-61.5,57,-62,56.5,-60.5,56,-59.5,55,-58,55,-57.5,54.5,-57,54,-56,53.5,-55.5,52,-56.5,52,-57,51.5,-59,51,-60,50,-61.5,50,-64,50.5,-65.5,50.5,-66.5,50,-67,49.5,-68.5,49,-70,47.5,-71,47,-70.5,47,-68.5,48.5,-66.5,49,-65,49,-64,48.5,-65,48,-65,47,-64.5,46,-63,45.5,-61.5,46,-60.5,47,-60.5,46.5,-60,46,-61,45.5,-63.5,44.5,-64,44.5,-65.5,43.5,-66,43.5,-66,44.5,-64.5,45.5,-66,45.5,-67,45,-68,45.5,-68,47,-68,47.5,-69,47,-69,47.5,-70,46.5,-70.5,46,-70.5,45.5,-71,45.5,-71.5,45.5,-71.5,45,-73.5,45,-75,45,-75.5,45,-76.5,44,-77,43.5,-77.5,43.5,-78.5,43.5,-79,43.5,-79,43,-80,42.5,-81.5,42,-82.5,41.5,-83,42,-83,42.5,-82.5,43,-82,43.5,-82.5,44.5,-82.5,45.5,-83.5,46,-84,46,-84,46.5,-84.5,46.5,-85,46.5,-85,47,-85.5,47,-86.5,47.5,-87.5,48,-88.5,48.5,-89.5,48,-91,48.5,-91.5,48,-92.5,48.5,-93.5,48.5,-94.5,48.5,-94.5,49,-95,49.5,-95,49,-97,49,-100.5,49,-104,49,-107,49,-110,49,-113,49,-116,49,-117,49,-120,49,-123,49],[-84,62.5,-83.5,63,-82,63,-82,62.5,-83,62,-84,62,-84,62.5],[-80,73,-81,73.5,-80.5,74,-78,73.5,-76.5,73,-77.5,73,-78.5,73,-79.5,72.5,-80,73],[-93.5,75,-94,74.5,-95.5,74.5,-97,75,-96.5,75.5,-95,75.5,-94,75.5,-93.5,75],[-94,77.5,-94.5,77.5,-96,77.5,-96.5,78,-94.5,78,-93.5,77.5,-94,77.5],[-97,79,-95.5,78.5,-96,78,-97.5,78,-98,78,-98.5,78.5,-98.5,79,-97.5,79,-97,79],[-88,74.5,-90,74.5,-92.5,75,-93,75.5,-93,76,-94,76.5,-96,76.5,-97,77,-96.5,77,-94.5,77,-93.5,77,-91.5,77,-90.5,76.5,-91,76,-90,76,-89,75.5,-88,75.5,-86.5,75.5,-85,75.5,-83,76,-81,75.5,-80,75.5,-80,75,-80.5,74.5,-82,74.5,-83,74.5,-86,74.5,-88,74.5],[-111.5,78,-110,78,-110,77.5,-112,77.5,-113.5,77.5,-112.5,78,-111.5,78],[-111,79,-109.5,78.5,-111,78.5,-112.5,78.5,-111.5,79,-111,79],[-55.5,51.5,-56,50.5,-57,50,-56,50,-55.5,50,-56,49.5,-55,49.5,-54.5,49.5,-53.5,49,-54,48.5,-53,48.5,-53,48,-52.5,47.5,-53,46.5,-53.5,46.5,-54,47,-54,47.5,-54,48,-55.5,47,-56,47,-55.5,47.5,-56.5,47.5,-57.5,47.5,-59.5,47.5,-59.5,48,-59,48.5,-58.5,49,-57.5,50.5,-56.5,51.5,-56,51.5,-55.5,51.5],[-84,65,-83,65,-81.5,64.5,-81.5,64,-81,64,-80,63.5,-81,63.5,-82.5,63.5,-83,64,-84,63.5,-85.5,63,-86,63.5,-87,63.5,-86.5,64,-86,65,-86,65.5,-85,65.5,-85,65,-84.5,65.5,-84,65],[-79,72.5,-78,72.5,-75.5,72,-74,72,-74,71.5,-72,71.5,-71,71,-69,70.5,-68,70,-67,69,-69,68.5,-66.5,68,-65,68,-63.5,67,-62,67,-62,66,-64,65,-65,65.5,-66.5,66.5,-68,66.5,-68,65.5,-67,65,-65.5,64.5,-64.5,63.5,-65,62.5,-66.5,63,-69,63.5,-67.5,63,-66.5,62.5,-66,62,-69,62.5,-71,63,-72,63.5,-73.5,64,-75,64.5,-77.5,64,-78.5,64.5,-78,65.5,-76,65.5,-74,65.5,-74.5,66,-74,66.5,-72.5,67.5,-73,67.5,-73.5,68,-75,68.5,-77,69,-76,69,-77.5,70,-78,70,-79,70,-79.5,70,-81.5,69.5,-85,70,-87,70.5,-88.5,70.5,-89.5,71,-88.5,71,-90,71,-90,72,-89.5,73,-88.5,73.5,-86,74,-86.5,73,-86,72.5,-85,73.5,-82.5,74,-80.5,72.5,-80.5,72,-79,72.5],[-94.5,74,-92.5,74,-90.5,74,-92,73,-93,73,-94.5,72,-95.5,72,-96,73,-96,73.5,-95.5,74,-94.5,74],[-123,76,-121,77,-119,77.5,-117.5,77.5,-116,77.5,-116.5,77,-117,76.5,-118,76.5,-120,76,-121.5,76,-123,76],[-132.5,54,-131.5,54,-132,53,-131,52,-131.5,52,-132,52.5,-132.5,53,-133,53.5,-133,54,-132.5,54],[-105.5,79.5,-103.5,79,-101,79,-100,78.5,-99.5,78,-101.5,78,-103,78.5,-105,78.5,-104,78.5,-105.5,79,-105.5,79.5],[-123.5,48.5,-124,48.5,-125.5,49,-126,49,-127,49.5,-127,50,-128,50,-128.5,50.5,-128.5,51,-127.5,50.5,-126.5,50.5,-126,50.5,-125.5,50,-125,49.5,-124,49,-123.5,48.5],[-121.5,74.5,-120,74,-117.5,74,-116.5,74,-115.5,73.5,-117,73,-119,72.5,-120.5,72,-120.5,71.5,-123,71,-123.5,71.5,-126,72,-125.5,72.5,-125,73,-124,73.5,-125,74.5,-121.5,74.5],[-108,76,-107,76,-106,76,-105.5,75.5,-106.5,75,-109.5,75,-112,74.5,-113.5,74.5,-114,74.5,-112,75,-116.5,75,-117.5,75,-116.5,76,-115.5,76.5,-112.5,76,-111,75.5,-109,75.5,-110.5,76.5,-109.5,77,-108.5,76.5,-108,76],[-106.5,73,-105.5,72.5,-105,71.5,-104.5,71,-103,70.5,-101,70,-101,69.5,-102.5,69.5,-102,69,-102.5,69,-104,69,-106,69,-107,69,-109,69,-111.5,68.5,-113.5,68.5,-114,69,-115,69.5,-116,69,-117.5,70,-116.5,70,-115,70,-113.5,70,-112.5,70.5,-114.5,70.5,-116.5,70.5,-118,70.5,-118.5,71,-116,71.5,-117.5,71.5,-119.5,71.5,-118.5,72.5,-118,72.5,-115,73.5,-114,73,-114.5,72.5,-112.5,73,-111,72.5,-110,73,-109,72.5,-108,71.5,-107.5,72,-108.5,73,-107.5,73,-106.5,73],[-100.5,72.5,-101.5,73.5,-100.5,74,-99,73.5,-97.5,74,-97,73.5,-98,73,-96.5,72.5,-96.5,71.5,-98.5,71.5,-99.5,71.5,-100,71.5,-102.5,72.5,-102.5,73,-100.5,72.5],[-106.5,73.5,-105.5,73.5,-104.5,73.5,-105.5,73,-107,73.5,-106.5,73.5],[-98.5,76.5,-97.5,76.5,-97.5,75.5,-98,75,-100,75,-101,75,-101,75.5,-102.5,75.5,-102.5,76.5,-101.5,76.5,-100,76.5,-98.5,76.5],[-96,80.5,-95.5,81,-94.5,81,-92.5,81.5,-91,80.5,-89.5,80.5,-88,80.5,-87,79.5,-86,79.5,-87,79,-89,78.5,-91,78,-93,78.5,-94,79,-93,79.5,-95,79.5,-96,79.5,-96.5,80,-96,80.5],[-91.5,82,-90,82,-89,82,-87,82.5,-85.5,82.5,-84.5,82.5,-83,82.5,-82.5,83,-81,83,-79.5,83,-76,83,-75.5,83,-73,83,-70.5,83,-68.5,83,-66,83,-63.5,83,-62,82.5,-64.5,82,-67,81.5,-67.5,81.5,-65.5,81.5,-68,81,-69.5,80.5,-71,80,-73,79.5,-74,79.5,-77,79.5,-75.5,79,-76,79,-75.5,78.5,-76.5,78,-78,78,-78.5,77.5,-80,77,-79.5,77,-78,77,-80.5,76,-83,76.5,-86,76.5,-87.5,76.5,-89.5,76.5,-89.5,77,-88,77,-88.5,78,-87.5,78,-85,77.5,-86.5,78,-88,78.5,-87,79,-85.5,79,-85,79.5,-86.5,79.5,-87,80.5,-84,80,-83.5,80,-82,80.5,-84,80.5,-87.5,80.5,-89.5,81,-90,81.5,-91.5,81.5,-91.5,82],[-75,67.5,-76,67,-77,67,-77,67.5,-77,68,-76,68.5,-75,68,-75,67.5],[-96.5,69.5,-95.5,69,-96.5,69,-97.5,69,-98.5,69,-100,69.5,-99,69.5,-98,70,-97,70,-96.5,69.5],[-64.5,50,-64,50,-63,49.5,-62,49.5,-62,49,-62.5,49,-63.5,49.5,-64.5,50],[-64,47,-63.5,46.5,-63,46.5,-62,46.5,-62.5,46,-63,46,-64,46.5,-64.5,46.5,-64,47],[-123,49,-120,49,-117,49,-116,49,-113,49,-110,49,-107,49,-104,49,-100.5,49,-97,49,-95,49,-95,49.5,-94.5,49,-94.5,48.5,-93.5,48.5,-92.5,48.5,-91.5,48,-91,48.5,-89.5,48,-88.5,48.5,-87.5,48,-86.5,47.5,-85.5,47,-85,47,-85,46.5,-84.5,46.5,-84,46.5,-84,46,-83.5,46,-82.5,45.5,-82.5,44.5,-82,43.5,-82.5,43,-83,42.5,-83,42,-82.5,41.5,-81.5,42,-80,42.5,-79,43,-79,43.5,-78.5,43.5,-77.5,43.5,-77,43.5,-76.5,44,-75.5,45,-75,45,-73.5,45,-71.5,45,-71.5,45.5,-71,45.5,-70.5,45.5,-70.5,46,-70,46.5,-69,47.5,-69,47,-68,47.5,-68,47,-68,45.5,-67,45,-68,44.5,-69,44,-70,43.5,-70.5,43,-71,43,-71,42.5,-70.5,42,-70,42,-70,41.5,-70.5,41.5,-71,41.5,-72,41.5,-72.5,41.5,-73,41,-73.5,41,-72,41,-73.5,40.5,-74,40.5,-74,41,-74.5,40.5,-74,40.5,-74,39.5,-75,39,-75.5,39.5,-75.5,39,-75,39,-75,38.5,-75.5,38,-76,37,-76,37.5,-75.5,38,-76,38.5,-76.5,39,-76.5,38.5,-76.5,38,-77,38,-76.5,38,-76.5,37,-76,37,-76,36.5,-75.5,35.5,-76.5,35,-77.5,34.5,-78,34,-78.5,34,-79,33.5,-79,33,-80.5,32.5,-81,32,-81.5,31.5,-81.5,30.5,-81.5,30,-81,29,-80.5,28.5,-80.5,28,-80,27,-80,26,-80.5,25,-81,25,-81.5,25.5,-81.5,26,-82,26.5,-82.5,27.5,-83,28,-82.5,28.5,-83,29,-83.5,30,-84,30,-85,29.5,-85.5,29.5,-86,30,-86.5,30.5,-87.5,30.5,-88.5,30.5,-89,30.5,-89.5,30,-89.5,29.5,-89,29.5,-89.5,29,-90,29.5,-90,29,-91,29,-91.5,29.5,-92.5,29.5,-93,30,-94,29.5,-94.5,29.5,-95.5,28.5,-96.5,28.5,-97,28,-97.5,27.5,-97.5,26.5,-97.5,26,-97,26,-97.5,26,-98,26,-99,26.5,-99.5,27,-99.5,27.5,-100,28,-100.5,28.5,-101,29.5,-101.5,30,-102.5,30,-103,29,-104,29.5,-104.5,29.5,-104.5,30,-105,30.5,-105.5,31,-106,31.5,-106.5,32,-108,32,-108,31.5,-109,31.5,-111,31.5,-113.5,32,-115,32.5,-114.5,32.5,-116,32.5,-117,32.5,-117.5,33,-118,33.5,-118.5,33.5,-118.5,34,-119,34,-119.5,34.5,-120.5,34.5,-120.5,35,-121.5,36,-122.5,37.5,-122.5,38,-123,38,-123.5,39,-124,40,-124.5,40.5,-124,41,-124,42,-124.5,43,-124,43.5,-124,44.5,-124,45.5,-124,47,-124.5,47.5,-124.5,48,-124.5,48.5,-123,48,-122.5,47,-122.5,47.5,-122.5,48,-123,49],[-166.5,60.5,-165.5,60.5,-165.5,60,-166,60,-167,60,-167.5,60,-166.5,60.5],[-153,58,-152.5,58,-152,57.5,-153,57,-154,56.5,-154.5,57,-154.5,57.5,-154,58,-153,58],[-141,69.5,-141,66,-141,60.5,-140,60.5,-139,60,-138.5,59.5,-137.5,59,-136.5,59.5,-135.5,60,-135,59.5,-134.5,59,-133.5,58.5,-132.5,57.5,-131.5,56.5,-130,56,-130,55.5,-130.5,55,-131,55,-132,55.5,-132.5,56.5,-133.5,57,-134,58,-135,58,-136.5,58,-138,58.5,-140,59.5,-141,59.5,-142.5,60,-144,60,-146,60.5,-147,61,-148,60.5,-148,60,-148.5,60,-149.5,59.5,-150.5,59.5,-151.5,59,-152,59.5,-151.5,60.5,-150.5,61,-150.5,61.5,-152,60.5,-152.5,60,-154,59.5,-153.5,59,-154,58,-155.5,57.5,-156.5,57.5,-156.5,57,-158,56.5,-158.5,56,-159.5,55.5,-160.5,55.5,-161,55.5,-162,55,-163,54.5,-165,54.5,-164,55,-163,55.5,-162,56,-160.5,56,-160,56.5,-158.5,57,-157.5,57.5,-157.5,58.5,-157,59,-158,58.5,-158.5,59,-159,58.5,-159.5,59,-160,58.5,-160.5,59,-161.5,58.5,-162,58.5,-162,59.5,-162.5,60,-164,60,-164.5,60.5,-165.5,60.5,-165.5,61,-166,61.5,-165.5,62,-165,62.5,-164.5,63,-164,63,-163,63,-162.5,63.5,-161.5,63.5,-161,64,-161.5,64.5,-161,65,-161.5,65,-162.5,64.5,-163,64.5,-163.5,64.5,-165,64.5,-166.5,64.5,-167,65,-168,65.5,-166.5,66,-164.5,66.5,-163.5,66.5,-164,66,-161.5,66,-162.5,66.5,-163.5,67,-164.5,67.5,-165.5,68,-167,68.5,-166,69,-164.5,69,-163,69.5,-163,70,-162,70.5,-161,70.5,-159,71,-158,71,-156.5,71.5,-155,71,-154.5,70.5,-154,71,-152,71,-152.5,70.5,-150.5,70.5,-149.5,70.5,-147.5,70,-145.5,70,-145,70,-143.5,70,-142,70,-141,69.5],[-171.5,64,-171,63.5,-170.5,63.5,-169.5,63.5,-168.5,63.5,-169,63,-169.5,63,-170.5,63,-170.5,63.5,-171.5,63.5,-172,63.5,-171.5,64],[87.5,49,86.5,48.5,86,48.5,85.5,47.5,85,47,83,47.5,82.5,45.5,82,45.5,80,45,81,43,80,43,80.5,42.5,79.5,42.5,79,43,77.5,43,76,43,75.5,43,74,43.5,73.5,43,73.5,42.5,72,43,71,42.5,70.5,42,69,41.5,68.5,40.5,68,41,66.5,41,66.5,42,66,42,66,43,65,43.5,63,43.5,62,43.5,61,44.5,60,45,58.5,45.5,56,45,56,41.5,55.5,41.5,55,42,54,42.5,53,42,52.5,42,52.5,42.5,52.5,43,51.5,43,51,44,50.5,44.5,51.5,44.5,51.5,45,52,45.5,53,45.5,53,46,53,47,52,47,51,47,50,46.5,49,46.5,48.5,46.5,48.5,47,48,47.5,47.5,47.5,46.5,48.5,47,49,47,49.5,47.5,50.5,48.5,50,48.5,50.5,51,51.5,52.5,51.5,54.5,51,55.5,50.5,57,51,58.5,51,59.5,50.5,60,51,61.5,51,61.5,51.5,60,52,61,52.5,60.5,52.5,61.5,53,61,53.5,61.5,54,65,54.5,65.5,54.5,68,55,69,55.5,71,55,71,54,72,54.5,73.5,54,73.5,53.5,74.5,53.5,77,54.5,76.5,54,78,53.5,80,51,80.5,51.5,82,51,83.5,51,84,51,84.5,50.5,85,50,85.5,49.5,87,50,87.5,49],[56,41.5,56,45,58.5,45.5,60,45,61,44.5,62,43.5,63,43.5,65,43.5,66,43,66,42,66.5,42,66.5,41,68,41,68.5,40.5,69,41.5,70.5,42,71,42.5,71.5,42,70.5,41.5,71,41,72,41.5,73,41,72,40,71,40,70.5,40,70.5,40.5,70.5,41,69.5,40.5,69,40,68.5,39.5,67.5,39.5,67.5,39,68,39,68.5,38,68,37,67,37.5,66.5,37.5,66.5,38,65,38.5,64,39,63.5,39.5,62.5,40,62,41,61.5,41.5,60.5,41,60,41.5,60,42,58.5,43,58,42,57,42,57,41.5,56,41.5],[141,-2.5,142.5,-3.5,144.5,-4,145.5,-4.5,146,-5,146,-5.5,147.5,-6,148,-6.5,147,-6.5,147,-7.5,148,-8,148.5,-9,149.5,-9,149.5,-9.5,150,-9.5,149.5,-10,151,-10.5,150.5,-10.5,150,-10.5,149,-10.5,148,-10,147,-9.5,146.5,-9,146,-8,144.5,-7.5,144,-8,143.5,-8,143.5,-9,142.5,-9.5,142,-9,141,-9,141,-6,141,-2.5],[152.5,-3.5,153,-4,153,-4.5,153,-5,152.5,-4,152,-3.5,151.5,-3,150.5,-2.5,151,-2.5,151.5,-3,152,-3,152.5,-3.5],[151.5,-6,151,-6,150,-6.5,149.5,-6.5,149,-6,148.5,-5.5,149.5,-5.5,150,-5.5,150,-5,150,-5.5,151,-5.5,151,-5,151.5,-5,151.5,-4,152,-4,152.5,-4.5,152.5,-5,152,-5.5,151.5,-5.5,151.5,-6],[155,-5.5,155.5,-6,156,-6.5,156,-7,155.5,-7,155,-6.5,154.5,-6,154.5,-5,155,-5.5],[141,-2.5,141,-6,141,-9,140,-8.5,139,-8,139,-8.5,137.5,-8.5,138,-7.5,138.5,-7.5,138.5,-6,138,-5.5,136,-4.5,135,-4.5,133.5,-3.5,133.5,-4,133,-4,133,-3.5,132,-3,133,-2.5,134,-2.5,133.5,-2,132,-2,132,-1.5,131,-1.5,130.5,-1,132,-0.5,132.5,-0.5,134,-1,134.5,-3,135.5,-3.5,136.5,-2.5,137.5,-1.5,138.5,-1.5,139,-2,140,-2.5,141,-2.5],[118,4,117.5,3,118,2.5,118,2,119,1,118,1,117.5,0,117.5,-1,116.5,-1.5,116.5,-2.5,116,-4,116,-3.5,115,-4,114.5,-3.5,114,-3.5,113.5,-3,112,-3.5,111.5,-3,111,-3,110,-3,110,-1.5,109.5,-1.5,109,-0.5,109,0.5,109,1.5,109.5,2,110,1.5,110.5,1,111,1,112,1,112.5,1.5,113,1.5,114,1,114.5,1.5,115,3,115.5,3,116,4.5,117,4.5,118,4],[129.5,-3,130.5,-3,131,-4,130,-3.5,129,-3.5,128.5,-3.5,128,-3.5,128,-3,129.5,-3],[128,2,128,1.5,128.5,1.5,128.5,1,128.5,0.5,128,0.5,128,-0.5,128.5,-1,128,-1,127.5,-0.5,127.5,1,127.5,2,128,2],[123,1,124,1,125,1.5,124.5,0.5,123.5,0,122.5,0.5,121,0.5,120,0,120,-0.5,121,-1.5,121.5,-1,123.5,-0.5,123.5,-1,123,-1,122.5,-1.5,121.5,-2,122.5,-3,122.5,-3.5,123,-4.5,123,-5.5,122.5,-5.5,122,-5.5,122.5,-4.5,121.5,-5,121.5,-4.5,121.5,-4,121,-3.5,121,-2.5,120.5,-3,120.5,-4,120.5,-5.5,120,-5.5,119.5,-5.5,119.5,-4.5,119.5,-3.5,119,-3.5,119,-3,119,-2,119.5,-1.5,120,0,120,0.5,121,1.5,121.5,1,123,1],[120.5,-10.5,119,-9.5,120,-9.5,120.5,-9.5,121,-10,120.5,-10,120.5,-10.5],[121.5,-8.5,122,-8.5,123,-8,123,-8.5,121.5,-9,120,-9,120,-8.5,120.5,-8,121.5,-8.5],[118.5,-8.5,119,-8.5,118,-9,117.5,-9,116.5,-9,117,-8.5,117.5,-8.5,118,-8,118.5,-8.5],[108.5,-6.5,108.5,-7,110.5,-7,111,-6.5,112.5,-7,113,-7.5,114.5,-8,115.5,-8.5,114.5,-9,113.5,-8.5,112.5,-8.5,111.5,-8.5,110.5,-8,109.5,-7.5,108.5,-7.5,108.5,-8,106.5,-7.5,106.5,-7,105.5,-7,106,-6,107.5,-6,108,-6.5,108.5,-6.5],[104.5,-1,104.5,-2,105,-2.5,105.5,-2.5,106,-3,106,-4.5,106,-6,104.5,-6,104,-5,102.5,-4,102,-3.5,101.5,-3,101,-2,100,-0.5,99.5,0,99,1,98.5,2,97.5,2.5,97,3.5,96.5,4,95.5,5,95.5,5.5,96,5.5,97.5,5,98.5,4.5,99,3.5,99.5,3,100.5,2,101.5,2,102.5,1.5,103,0.5,104,0,103.5,-0.5,104,-1,104.5,-1],[-68.5,-52.5,-68,-53,-67.5,-54,-66.5,-54.5,-65,-54.5,-65.5,-55,-66.5,-55,-67,-55,-67.5,-55,-68.5,-55,-68.5,-52.5],[-57.5,-30,-58,-31,-58,-32,-58,-33,-58.5,-33.5,-58.5,-34,-58.5,-34.5,-57,-35.5,-57.5,-36,-56.5,-36.5,-57,-37,-57.5,-38,-59,-38.5,-61,-39,-62.5,-39,-62,-39.5,-62.5,-40,-62,-40.5,-62.5,-41,-64,-41,-64.5,-41,-65,-41,-65,-42,-64.5,-42.5,-64,-42,-63.5,-42.5,-64.5,-43,-65,-43.5,-65.5,-44.5,-65.5,-45,-66.5,-45,-67.5,-45.5,-67.5,-46.5,-66.5,-47,-65.5,-47,-66,-48,-67,-48.5,-68,-50,-68.5,-50.5,-69,-50.5,-69,-52,-68,-52.5,-68.5,-52.5,-69.5,-52,-72,-52,-72.5,-51.5,-72.5,-50.5,-73,-50.5,-73.5,-50.5,-73.5,-49.5,-72.5,-49,-72.5,-48,-72.5,-47.5,-72,-47,-71.5,-45.5,-71.5,-45,-71,-45,-71.5,-44.5,-72,-44,-71.5,-44,-72,-43.5,-72,-42.5,-71.5,-42,-72,-41,-71.5,-40,-71.5,-39,-71,-38.5,-71,-37.5,-71,-36.5,-70.5,-36,-70.5,-35,-70,-34,-70,-33.5,-70,-33,-70.5,-31.5,-70,-30.5,-70,-29.5,-69.5,-28.5,-69,-27.5,-68.5,-27,-68.5,-26.5,-68.5,-26,-68.5,-24.5,-67.5,-24,-67,-23,-67,-22.5,-66.5,-22,-65,-22,-64.5,-23,-64,-22,-63,-22,-62.5,-22,-61,-24,-60,-24,-59,-25,-58,-25,-57.5,-25.5,-58.5,-27,-57.5,-27.5,-56.5,-27.5,-55.5,-27.5,-55,-26.5,-54.5,-25.5,-54,-25.5,-53.5,-26,-53.5,-27,-54.5,-27.5,-55,-28,-56.5,-29,-57.5,-30],[-68.5,-52.5,-68.5,-55,-67.5,-55,-67,-55,-67.5,-55.5,-68,-55.5,-68.5,-55.5,-69,-55.5,-70,-55,-71,-55,-72.5,-54.5,-73.5,-54,-74.5,-53,-74,-53,-72.5,-53.5,-71,-54,-70.5,-53.5,-70.5,-53,-69.5,-52.5,-68.5,-52.5],[-69.5,-17.5,-69,-18.5,-69,-19,-68.5,-19.5,-69,-20.5,-68,-21.5,-68,-23,-67,-22.5,-67,-23,-67.5,-24,-68.5,-24.5,-68.5,-26,-68.5,-26.5,-68.5,-27,-69,-27.5,-69.5,-28.5,-70,-29.5,-70,-30.5,-70.5,-31.5,-70,-33,-70,-33.5,-70,-34,-70.5,-35,-70.5,-36,-71,-36.5,-71,-37.5,-71,-38.5,-71.5,-39,-71.5,-40,-72,-41,-71.5,-42,-72,-42.5,-72,-43.5,-71.5,-44,-72,-44,-71.5,-44.5,-71,-45,-71.5,-45,-71.5,-45.5,-72,-47,-72.5,-47.5,-72.5,-48,-72.5,-49,-73.5,-49.5,-73.5,-50.5,-73,-50.5,-72.5,-50.5,-72.5,-51.5,-72,-52,-69.5,-52,-68.5,-52.5,-69.5,-52.5,-70,-52.5,-71,-53,-71,-54,-71.5,-54,-72.5,-53.5,-73.5,-53,-75,-52.5,-75.5,-51.5,-75,-51,-75.5,-50.5,-75.5,-48.5,-75,-47.5,-74,-47,-75.5,-46.5,-74.5,-46,-74.5,-44,-73,-44.5,-72.5,-42.5,-73.5,-42,-73.5,-43.5,-74.5,-43,-74,-42,-73.5,-40,-73,-39.5,-73.5,-38.5,-73.5,-37,-73,-37,-72.5,-35.5,-72,-34,-71.5,-32.5,-71.5,-31,-71.5,-30,-71.5,-29,-71,-27.5,-70.5,-25.5,-70.5,-23.5,-70,-21.5,-70,-20,-70.5,-18.5,-70,-18,-69.5,-17.5],[29.5,-4.5,29.5,-5.5,29.5,-6,29.5,-6.5,30,-7,30.5,-8.5,30.5,-8,29,-8.5,28.5,-8.5,28.5,-9,28.5,-9.5,28.5,-11,28.5,-12,29.5,-12.5,29.5,-12,29.5,-13.5,29,-13,28.5,-12.5,28,-12.5,27.5,-12,27,-11.5,26.5,-12,26,-12,25.5,-11.5,25,-11,24.5,-11.5,24.5,-11,24,-11,23.5,-11,23,-11,22.5,-11,22,-11,22,-10,22,-9.5,22,-9,22,-8.5,21.5,-8,21.5,-7.5,20.5,-7.5,20.5,-7,20,-7,19.5,-7,19,-7.5,19,-8,18.5,-8,18,-8,17.5,-8,17,-7.5,17,-7,16.5,-6.5,16.5,-6,13.5,-6,13,-6,12.5,-6,12,-6,12.5,-5.5,12.5,-5,13,-5,13.5,-5,13.5,-4.5,14,-4.5,14,-5,14.5,-5,15,-4.5,16,-4,16,-3.5,16,-2.5,16.5,-1.5,17,-1,17.5,-0.5,17.5,0,18,0.5,18,1,18,1.5,18,2.5,18.5,3,18.5,3.5,18.5,4,19,4.5,19.5,5,20.5,4.5,21,4.5,21.5,4,22.5,4,22.5,4.5,23,4.5,23.5,4.5,24.5,5,25,5,25.5,5,25.5,5.5,26.5,5,27,5,27.5,5,28,4.5,28.5,4.5,29,4.5,29.5,4.5,30,4,31,3.5,31,2.5,31,2,30.5,1.5,30,1,30,0.5,30,0,29.5,-0.5,29.5,-1.5,29.5,-2,29,-2.5,29,-3,29.5,-3.5,29.5,-4.5],[41.5,-1.5,41,-1,41,3,42,4,43,4.5,43.5,5,45,5,48,8,48.5,9,49,9.5,49,10,49,11,49,11.5,49.5,11.5,50.5,11.5,50.5,12,51,12,51,11.5,51,11,51,10.5,50.5,9,50,8,49.5,7,48.5,5.5,47.5,4,46.5,3,45.5,2,44,1,43,0.5,42,-1,42,-1.5,41.5,-1.5],[39,-4.5,38,-3.5,37.5,-3,34,-1,34,0,34,0.5,34.5,1,35,2,34.5,3,34.5,3.5,34,4,34.5,5,35.5,5.5,36,5.5,36,5,36,4.5,37,4.5,38,3.5,38.5,3.5,39,3.5,39.5,3.5,40,4,41,4.5,41,4,42,4,41,3,41,-1,41.5,-1.5,41,-2,40.5,-2.5,40,-3.5,39.5,-4.5,39,-4.5],[24.5,8,24,8.5,23.5,9,23.5,9.5,23.5,10,23,10.5,23,11,23,11.5,22.5,11.5,22.5,12.5,22,12.5,22,13,22.5,13.5,22,14,22.5,14,22.5,14.5,22.5,15,23,15.5,24,15.5,24,19.5,24,20,25,20,25,22,29,22,33,22,37,22,37,21,37,20,37.5,18.5,38,18.5,38.5,18,38,17.5,37,17.5,37,17,37,16.5,36.5,15,36.5,14.5,36.5,13.5,36,12.5,35.5,12,35,11.5,34.5,11,34.5,10.5,34,9.5,34,8.5,34,9.5,34,10,33.5,10.5,33,10.5,33,11.5,33,12,32.5,12,32,12,32.5,11.5,32.5,11,32,10.5,31.5,10,31,9.5,30,10.5,29.5,10,29,9.5,28,9.5,27,9.5,26.5,9.5,26,10,26,10.5,25,10.5,25,10,24.5,9,24,8.5,24.5,8],[24,19.5,24,15.5,23,15.5,22.5,15,22.5,14.5,22.5,14,22,14,22.5,13.5,22,13,22,12.5,22.5,12.5,22.5,11.5,23,11.5,23,11,22,11,21.5,10.5,21,9.5,20,9,19,9,19,8.5,18.5,8.5,18,8,16.5,7.5,16.5,8,16,7.5,15.5,7.5,15,8.5,15,9,14.5,9,14,9.5,14,10,14.5,10,15,10,15.5,10,15,11,15,11.5,15,12,14.5,13,14.5,13.5,14,13.5,14,14,13.5,14.5,14,15.5,15,16.5,15.5,18,15.5,20,16,20.5,15.5,20.5,15.5,21,15,21.5,15,23,16,23.5,20,21.5,24,19.5],[-71.5,19.5,-71.5,19,-72,18.5,-71.5,18.5,-71.5,18,-72.5,18,-73,18,-73.5,18,-74,18,-74.5,18.5,-73.5,18.5,-72.5,18.5,-73,19,-73,19.5,-73.5,19.5,-73,20,-72.5,20,-71.5,19.5],[-71.5,18,-71.5,18.5,-72,18.5,-71.5,19,-71.5,19.5,-71.5,20,-71,20,-70,19.5,-69,19.5,-69.5,19,-69,19,-68.5,18.5,-68.5,18,-69,18.5,-69.5,18.5,-70,18.5,-70,18,-70.5,18,-70.5,18.5,-71,18.5,-71.5,17.5,-71.5,18],[49,46.5,48.5,46,47.5,45.5,46.5,44.5,47.5,43.5,47.5,43,48.5,42,48,41.5,48,41,47.5,41,46.5,42,46,42,45.5,42.5,44.5,42.5,44,42.5,42.5,43,41,43.5,40,43.5,38.5,44.5,37.5,44.5,36.5,45,37.5,45.5,38,46,37.5,46.5,39,47,39,47.5,38,47,38.5,47.5,39,48,39.5,48,40,48,39.5,49,40,49.5,38.5,50,38,50,37.5,50.5,36.5,50,35.5,50.5,35.5,51,35,51,34,51.5,34.5,52,34,52.5,32.5,52,32.5,52.5,32,52,31.5,52.5,31.5,53,32.5,53,32.5,53.5,31.5,54,32,54,31.5,54,31,55,31,55.5,30,56,29.5,55.5,29,56,28,56,28,57,27.5,57.5,27.5,58,27.5,58.5,28,59.5,29,60,28,60.5,30,62,31,62.5,31.5,63,30,63.5,30.5,64,29.5,65,30,66,29,67,30,67.5,28.5,68.5,28.5,69,29.5,69,31,69.5,32,70,34,69.5,36.5,69,40.5,68,41,67.5,41,67,40,66.5,38.5,66,34,67,33,66.5,35,66,35,65.5,35,64.5,36,64,37,64,37,64.5,36.5,65,37,65,39.5,64.5,40.5,65,40,65.5,42,66.5,43,66.5,44,66,44.5,67,43.5,67.5,44,68,43.5,68.5,46.5,68.5,47,67.5,45.5,67.5,45.5,67,46.5,66.5,48,67,48,67.5,50,68,53.5,69,54.5,69,53.5,68,54.5,68,55.5,68.5,57.5,68.5,59,69,60,68.5,61,69,60,69.5,60.5,70,63.5,69.5,65,69,68.5,68,69,68.5,68,69,68,69.5,67,69.5,67.5,70,66.5,70.5,66.5,71,68.5,72,69,73,70,73,72.5,73,73,72,72,71.5,72.5,71,73,70.5,72.5,69,73.5,68.5,73,67.5,71.5,66.5,72.5,66,73,66.5,74,67,74,67.5,75,68,74.5,68.5,75,69,74,69,73.5,69.5,74.5,70.5,73,71.5,75,72,74.5,73,75,73,75.5,72.5,75.5,71.5,76.5,71,76,72,77.5,72.5,79.5,72.5,81.5,72,80.5,72.5,80.5,73.5,82.5,74,84.5,74,87,74,86,74.5,87,75,88.5,75,90.5,75.5,93,76,96,76,96.5,76,99,76.5,101,76.5,101,77,102,77.5,104.5,77.5,106,77.5,104.5,77,107,77,107,76.5,108,76.5,111,76.5,113.5,76,114,76,114,75.5,113,75,110,74.5,109.5,74,110.5,74,112,74,113,74,113.5,73.5,114,73.5,115.5,74,119,73.5,119,73,123,73,123.5,73.5,125.5,73.5,127,73.5,128.5,73,129,72.5,128.5,72,129.5,71,131.5,71,132.5,72,134,71.5,135.5,71.5,137.5,71.5,138,71.5,140,71.5,139,72.5,140.5,73,149.5,72,150.5,71.5,153,71,157,71,159,71,160,70.5,159.5,69.5,161,69.5,162.5,69.5,164,69.5,166,69.5,168,69.5,169.5,68.5,171,69,170,69.5,170.5,70,173.5,70,175.5,70,178.5,69.5,180,69,180,65,178.5,64.5,177.5,64.5,178.5,64,179,63.5,179.5,63,179.5,62.5,179,62.5,177.5,62.5,174.5,62,173.5,61.5,172,61,170.5,60.5,170.5,60,169,60.5,166.5,60,166,60,165,59.5,163.5,60,163,59,162,58,163,57.5,163,56,162,56,161.5,55.5,162,55,160.5,54.5,160,53,158.5,53,158,52,157,51,156.5,51.5,156,53,155.5,55.5,156,57,157,57.5,157,58,158.5,58,160,59.5,162,60.5,163.5,61,164.5,62.5,163.5,62.5,162.5,61.5,160,60.5,159.5,62,156.5,61.5,154,60,155,59,153,59,151.5,59,151.5,59.5,150,59.5,148.5,59,145.5,59.5,142,59,139,57,135,54.5,136.5,54.5,137,54,138,54,139,54.5,140,54,141.5,53,141.5,52,140.5,51,140.5,50,140,48.5,138.5,47,138,46.5,137,45,135.5,44,135,43.5,133.5,43,133,43,132.5,43.5,131,42.5,131,42,130.5,42.5,130.5,43,131,43,131.5,44,131,45,132,45.5,133,45,134,46,134,47,134.5,47.5,135,48.5,133.5,48,132.5,48,131,48,130.5,48.5,129.5,49.5,127.5,50,127.5,50.5,127,51.5,126.5,52,126,53,125,53,123.5,53.5,122,53.5,121,53.5,120,53,120.5,52.5,120.5,52,120,51.5,119.5,50.5,119.5,50,118,49.5,116.5,50,115.5,50,115,50,114.5,50,113,49.5,111.5,49.5,110.5,49,109.5,49.5,108.5,49.5,108,50,107,50.5,106,50.5,104.5,50.5,103.5,50,102.5,50.5,102,51.5,101,51.5,100,51.5,99,52,98,51,98,50.5,97.5,49.5,96,50,95,50,94,50.5,93,50.5,92,51,90.5,50.5,89,49.5,88,49.5,87.5,49,87,50,85.5,49.5,85,50,84.5,50.5,84,51,83.5,51,82,51,80.5,51.5,80,51,78,53.5,76.5,54,77,54.5,74.5,53.5,73.5,53.5,73.5,54,72,54.5,71,54,71,55,69,55.5,68,55,65.5,54.5,65,54.5,61.5,54,61,53.5,61.5,53,60.5,52.5,61,52.5,60,52,61.5,51.5,61.5,51,60,51,59.5,50.5,58.5,51,57,51,55.5,50.5,54.5,51,52.5,51.5,51,51.5,48.5,50.5,48.5,50,47.5,50.5,47,49.5,47,49,46.5,48.5,47.5,47.5,48,47.5,48.5,47,48.5,46.5,49,46.5],[94,81,96,81.5,98,80.5,100,80,100,79,98,79,95,79,93.5,79.5,92.5,80,91,80.5,94,81],[103,79.5,105.5,78.5,105,78.5,99.5,78,101.5,79,102,79.5,103,79.5],[139,76,141.5,76,145,75.5,144.5,75,140.5,75,139,74.5,137,75.5,137.5,76,139,76],[148,75.5,150.5,75,149.5,74.5,148,75,146,75,146.5,75.5,148,75.5],[140,73.5,141,74,142,74,143.5,73.5,143.5,73,142,73,140,73.5],[45,80.5,47,81,48.5,81,48.5,80.5,49,81,50,81,51.5,80.5,51,80.5,50,80.5,49,80.5,49,80,47.5,80,46.5,80,47,80.5,45,80.5],[22.5,54.5,21,54.5,19.5,54.5,20,55,21.5,55,22.5,55,23,55,22.5,54.5],[53.5,73.5,56,74.5,55.5,75,58,75.5,61,76.5,64.5,76.5,66,77,68,77,69,76.5,68,76,64.5,75.5,61.5,75.5,58.5,74.5,57,73.5,55.5,72.5,55.5,71.5,57.5,70.5,57,70.5,53.5,71,51.5,71.5,51.5,72,52.5,72,52.5,73,54.5,73.5,53.5,73.5],[143,53.5,143.5,52.5,143,52,143.5,50.5,144.5,49,143,49.5,142.5,48,143.5,47,143.5,46,142.5,46.5,142,46,142,47,142,48,142,49,142,49.5,142,51,141.5,52,141.5,53.5,142.5,54,142,54,142.5,54.5,143,53.5],[-175,67,-175,66.5,-174.5,66.5,-174.5,67,-172,67,-170,66,-171,65.5,-172.5,65.5,-172.5,64.5,-173,64.5,-174,64.5,-174.5,64.5,-176,65,-176,65.5,-177,65.5,-178.5,65.5,-179,65.5,-178.5,66,-180,66,-179.5,65.5,-180,65,-180,69,-177.5,68,-175,67],[-178.5,71,-180,71,-180,71.5,-179,71.5,-177.5,71.5,-177.5,71,-178.5,71],[33.5,46,34.5,46,35,46,35,45.5,35.5,45.5,36.5,45.5,36.5,45,35,45,34,44.5,33.5,44.5,33.5,45,32.5,45.5,33.5,46],[-61,-52,-60,-51,-59,-51.5,-58.5,-51,-57.5,-51.5,-58,-52,-59.5,-52,-60,-52,-60.5,-52.5,-61,-52],[15,79.5,15.5,80,17,80,18.5,79.5,21.5,79,19,78.5,18.5,78,17.5,77.5,17,77,16,77,14,77.5,14.5,77.5,13,78,11,79,10.5,79.5,13,80,13.5,79.5,15,79.5],[31,69.5,29.5,69,28.5,69,29,70,27.5,70,26,70,25.5,69,24.5,68.5,23.5,69,22.5,69,21,69.5,20.5,69,20,69,20,68.5,18,68.5,17.5,68,17,68,16,67.5,15,66,13.5,65,14,64.5,13.5,64,12.5,64,12,63,12,62,12.5,61.5,12.5,60,11.5,59.5,11,59,10.5,59.5,8.5,58.5,7,58,5.5,58.5,5.5,59.5,5,62,6,62.5,8.5,63.5,10.5,64.5,12.5,66,15,68,16.5,68.5,19,70,21.5,70.5,23,70,24.5,71,26.5,71,28,71,31.5,70.5,30,70,31,69.5],[27.5,80,26,79.5,23,79.5,20,79.5,20,80,18.5,80,17.5,80.5,20.5,80.5,22,80.5,23,80.5,25.5,80.5,27.5,80],[24.5,78,22.5,77.5,20.5,77.5,21.5,78,21,78.5,23,78.5,23.5,78,24.5,78],[-47,82.5,-43.5,83,-40,83,-38.5,83.5,-35,83.5,-27,83.5,-21,82.5,-22.5,82.5,-26.5,82.5,-32,82,-31.5,82,-28,82,-25,82,-23,82,-22,81.5,-23,81,-20.5,81.5,-16,82,-13,81.5,-12,81.5,-16.5,80.5,-17,80.5,-20,80,-17.5,80,-19,79.5,-19.5,79,-19.5,77.5,-18.5,77,-20,77,-21.5,76.5,-20,76,-19.5,75,-20.5,75,-19.5,74.5,-21.5,74,-20.5,74,-21,73.5,-22,73.5,-23.5,73.5,-22.5,72.5,-22.5,72,-24.5,72.5,-25,72.5,-23.5,72,-22,71.5,-22,70.5,-23.5,70.5,-24.5,71,-25.5,71.5,-25,71,-26.5,70,-23.5,70,-22.5,70,-25,69.5,-27.5,68.5,-30.5,68,-32,68,-33,67.5,-34,66.5,-36.5,66,-37,66,-38.5,65.5,-40,65.5,-40.5,65,-40.5,64,-41,63.5,-43,62.5,-42.5,62,-43,61,-43.5,60,-45,60,-46.5,61,-48.5,61,-49,61.5,-50,62.5,-51.5,63.5,-52,64.5,-52.5,65,-53.5,66,-53.5,67,-54,67,-53,68.5,-51.5,68.5,-51,69,-51,70,-52,69.5,-52.5,69.5,-53.5,69.5,-54.5,69.5,-55,70.5,-54.5,71,-53.5,71,-51.5,70.5,-53,71,-54,71.5,-55,71.5,-56,71.5,-54.5,72.5,-55.5,73,-56,73.5,-57.5,74.5,-58.5,75,-58.5,75.5,-61.5,76,-63.5,76,-66,76,-68.5,76,-69.5,76.5,-71.5,77,-69,77.5,-67,77.5,-71,77.5,-73.5,78,-73,78.5,-69.5,79,-65.5,79.5,-65.5,80,-68,80,-67,80.5,-63.5,81,-62,81.5,-62.5,82,-60.5,82,-57,82,-54,82,-53,82,-50.5,82.5,-48,82,-46.5,82,-44.5,81.5,-47,82,-47,82.5],[69,-48.5,69.5,-49,70.5,-49,70.5,-49.5,68.5,-50,68.5,-49,69,-49,69,-48.5],[125,-9,125,-8.5,126,-8.5,126.5,-8.5,127,-8.5,127.5,-8.5,127,-8.5,126,-9,125,-9.5,125,-9],[16.5,-28.5,17,-28,17,-28.5,17.5,-29,18,-29,18.5,-29,19,-29,20,-28.5,20,-25,21,-26,20.5,-26.5,21,-27,21.5,-26.5,22,-26.5,22.5,-26,23,-25.5,23.5,-25.5,24,-25.5,25,-25.5,25.5,-25.5,26,-25,26,-24.5,26.5,-24.5,27,-24,27,-23.5,28,-23,29.5,-22,30,-22,30.5,-22.5,30.5,-22,31,-22.5,31.5,-23.5,32,-24.5,32,-25.5,32,-26,31.5,-25.5,31,-25.5,31,-26,30.5,-26.5,31.5,-27.5,32,-27,32,-26.5,33,-26.5,32.5,-27.5,32.5,-28.5,32,-29,31.5,-29.5,31,-30,30.5,-30.5,30,-31,29,-32,28,-33,27.5,-33,26.5,-33.5,26,-33.5,26,-34,25,-34,24.5,-34,23.5,-34,23,-34,22.5,-34,21.5,-34.5,20.5,-34.5,20,-35,19.5,-35,19,-34.5,18.5,-34,18,-34,18.5,-33.5,18,-32.5,18,-31.5,17.5,-30.5,17,-30,16.5,-28.5],[29,-29,29.5,-29.5,29,-29.5,29,-30,28.5,-30,28,-30.5,27.5,-30.5,27,-30,27.5,-29,28,-29,28.5,-28.5,29,-29],[-117,32.5,-116,32.5,-114.5,32.5,-115,32.5,-113.5,32,-111,31.5,-109,31.5,-108,31.5,-108,32,-106.5,32,-106,31.5,-105.5,31,-105,30.5,-104.5,30,-104.5,29.5,-104,29.5,-103,29,-102.5,30,-101.5,30,-101,29.5,-100.5,28.5,-100,28,-99.5,27.5,-99.5,27,-99,26.5,-98,26,-97.5,26,-97,26,-97.5,25,-97.5,24.5,-98,23,-98,22.5,-97.5,22,-97.5,21.5,-97,20.5,-96.5,20,-96.5,19.5,-96,19,-95,18.5,-94.5,18,-93.5,18.5,-93,18.5,-92,18.5,-91.5,19,-91,19.5,-90.5,20,-90.5,20.5,-90.5,21,-89.5,21.5,-88.5,21.5,-87.5,21.5,-87,21.5,-87,21,-87.5,20.5,-87.5,19.5,-87.5,19,-88,18.5,-88.5,18.5,-89,18,-90,18,-91,18,-91,17.5,-91.5,17.5,-91,17,-90.5,16.5,-90.5,16,-91.5,16,-92,15.5,-92,15,-92,14.5,-93.5,15.5,-94,16,-94.5,16,-95.5,16,-96,16,-96.5,15.5,-97.5,16,-98,16,-99,16.5,-99.5,16.5,-101,17,-101.5,17.5,-102,18,-102.5,18,-103.5,18.5,-104,18.5,-105,19.5,-105.5,20,-105.5,20.5,-105.5,21,-105.5,21.5,-105.5,22,-105.5,22.5,-106,23,-107,24,-108,24.5,-108.5,25,-109.5,25.5,-109.5,26,-109.5,26.5,-110,26.5,-110.5,27,-110.5,28,-111,28,-112,28.5,-112,29,-112.5,29.5,-113,30,-113,31,-114,31.5,-115,32,-115,31.5,-115,31,-114.5,30,-113.5,29,-113,28.5,-113,28,-112.5,27.5,-112,27,-111.5,26.5,-111.5,25.5,-111,25.5,-110.5,25,-110.5,24.5,-110,24.5,-110,24,-109.5,23.5,-109.5,23,-110,23,-110.5,23.5,-111,24,-111.5,24.5,-112,24.5,-112,25.5,-112.5,26,-113,26.5,-113.5,27,-113.5,26.5,-114,27,-114.5,27,-115,27.5,-115,28,-114.5,27.5,-114,28,-114,28.5,-115,29.5,-115.5,29.5,-116,30,-116.5,31,-116.5,31.5,-117,32.5],[-57.5,-30,-57,-30,-56,-31,-55.5,-31,-54.5,-31.5,-54,-32,-53,-32.5,-53.5,-33,-53.5,-34,-54,-34.5,-55,-35,-55.5,-35,-56,-35,-57,-34.5,-58,-34.5,-58.5,-34,-58.5,-33.5,-58,-33,-58,-32,-58,-31,-57.5,-30],[-53.5,-34,-53.5,-33,-53,-32.5,-54,-32,-54.5,-31.5,-55.5,-31,-56,-31,-57,-30,-57.5,-30,-56.5,-29,-55,-28,-54.5,-27.5,-53.5,-27,-53.5,-26,-54,-25.5,-54.5,-25.5,-54.5,-25,-54.5,-24.5,-54.5,-24,-55,-24,-55.5,-24,-55.5,-23.5,-55.5,-22.5,-56,-22.5,-56.5,-22,-57,-22.5,-58,-22,-58,-20.5,-58,-20,-58,-19.5,-57.5,-19,-57.5,-18,-57.5,-17.5,-58.5,-17.5,-58.5,-17,-58,-16.5,-60,-16.5,-60.5,-15,-60.5,-14.5,-60.5,-14,-61,-13.5,-61.5,-13.5,-62,-13,-63,-13,-63,-12.5,-64.5,-12.5,-65.5,-11.5,-65.5,-11,-65.5,-10.5,-65.5,-10,-66.5,-10,-67,-10.5,-68,-10.5,-68.5,-11,-69,-11,-69.5,-11,-70,-11,-70.5,-11,-70.5,-9.5,-71.5,-10,-72,-10,-72.5,-9.5,-73,-9.5,-73,-9,-73.5,-8.5,-74,-7.5,-73.5,-7.5,-73.5,-7,-73,-6.5,-73,-6,-73,-5.5,-71.5,-4.5,-71,-4.5,-70,-4.5,-69.5,-1.5,-69.5,-1,-69.5,-0.5,-70,0,-70,0.5,-69.5,0.5,-69,1,-70,1,-70,1.5,-68,1.5,-67.5,2,-67.5,1.5,-67,1,-67,1.5,-66.5,0.5,-65.5,1,-64.5,1.5,-64,1.5,-64,2,-63.5,2,-63.5,2.5,-64.5,2.5,-64.5,3,-64.5,4,-65,4,-64.5,4,-64,4,-63,4,-62,4,-61,4.5,-60.5,5,-60,5,-60,4.5,-59.5,4,-60,3.5,-60,3,-59.5,2,-59,1.5,-58.5,1.5,-58,1.5,-57.5,1.5,-57.5,2,-57,2,-56.5,2,-56,2,-56,2.5,-55.5,2.5,-55,2.5,-54.5,2.5,-54,2,-54,2.5,-53.5,2.5,-53.5,2,-53,2,-52.5,2.5,-52,3,-51.5,4,-51,3.5,-50.5,2,-50,1.5,-50,1,-50.5,0,-48.5,0,-48.5,-1,-48,-0.5,-46.5,-1,-45,-1.5,-44.5,-2,-44.5,-2.5,-43.5,-2.5,-41.5,-3,-40,-3,-38.5,-3.5,-37,-5,-36.5,-5,-35.5,-5,-35,-5.5,-35,-6.5,-34.5,-7.5,-35,-9,-35.5,-9.5,-37,-11,-37.5,-12,-38.5,-13,-39,-14,-39,-15.5,-39,-17,-39.5,-18,-39.5,-18.5,-40,-19.5,-41,-21,-41,-22,-42,-22.5,-42,-23,-43,-23,-44.5,-23.5,-45.5,-24,-46.5,-24,-47.5,-25,-48.5,-26,-48.5,-26.5,-48.5,-27,-48.5,-28,-49,-28.5,-49.5,-29,-50.5,-31,-51.5,-32,-52.5,-32,-52.5,-33,-53.5,-34],[-69.5,-11,-69,-11,-68.5,-11,-68,-10.5,-67,-10.5,-66.5,-10,-65.5,-10,-65.5,-10.5,-65.5,-11,-65.5,-11.5,-64.5,-12.5,-63,-12.5,-63,-13,-62,-13,-61.5,-13.5,-61,-13.5,-60.5,-14,-60.5,-14.5,-60.5,-15,-60,-16.5,-58,-16.5,-58.5,-17,-58.5,-17.5,-57.5,-17.5,-57.5,-18,-57.5,-19,-58,-19.5,-58,-20,-59,-19.5,-60,-19.5,-62,-19.5,-62.5,-20.5,-62.5,-21,-62.5,-22,-63,-22,-64,-22,-64.5,-23,-65,-22,-66.5,-22,-67,-22.5,-68,-23,-68,-21.5,-69,-20.5,-68.5,-19.5,-69,-19,-69,-18.5,-69.5,-17.5,-69,-16.5,-69.5,-15.5,-69,-15.5,-69.5,-15,-69,-14.5,-69,-13.5,-69,-13,-68.5,-12.5,-69.5,-11],[-70,-4.5,-71,-4.5,-71.5,-4.5,-73,-5.5,-73,-6,-73,-6.5,-73.5,-7,-73.5,-7.5,-74,-7.5,-73.5,-8.5,-73,-9,-73,-9.5,-72.5,-9.5,-72,-10,-71.5,-10,-70.5,-9.5,-70.5,-11,-70,-11,-69.5,-11,-68.5,-12.5,-69,-13,-69,-13.5,-69,-14.5,-69.5,-15,-69,-15.5,-69.5,-15.5,-69,-16.5,-69.5,-17.5,-70,-18,-70.5,-18.5,-71.5,-18,-71.5,-17.5,-73.5,-16.5,-75,-15.5,-76,-14.5,-76.5,-14,-76.5,-13.5,-77,-12,-78,-10.5,-79,-8.5,-79.5,-8,-80,-7,-80.5,-6.5,-81,-6,-81,-5.5,-81.5,-4.5,-81,-4,-80.5,-3.5,-80,-4,-80.5,-4,-80.5,-4.5,-80,-4.5,-79.5,-4.5,-79,-5,-78.5,-4.5,-78.5,-4,-78,-3,-76.5,-2.5,-75.5,-1.5,-75,-1,-75.5,0,-75,0,-74.5,-0.5,-74,-1,-73.5,-1.5,-73,-2.5,-72.5,-2.5,-72,-2,-71.5,-2.5,-71,-2.5,-70,-2.5,-70.5,-3.5,-70.5,-4,-70,-4.5],[-67,1.5,-67,1,-67.5,1.5,-67.5,2,-68,1.5,-70,1.5,-70,1,-69,1,-69.5,0.5,-70,0.5,-70,0,-69.5,-0.5,-69.5,-1,-69.5,-1.5,-70,-4.5,-70.5,-4,-70.5,-3.5,-70,-2.5,-71,-2.5,-71.5,-2.5,-72,-2,-72.5,-2.5,-73,-2.5,-73.5,-1.5,-74,-1,-74.5,-0.5,-75,0,-75.5,0,-76,0,-76.5,0.5,-77.5,0.5,-77.5,1,-78,1,-79,1.5,-78.5,2,-78.5,2.5,-78,2.5,-77.5,3.5,-77,4,-77.5,4,-77.5,4.5,-77.5,5.5,-77.5,6,-77.5,6.5,-78,7,-78,7.5,-77.5,7.5,-77,8,-77.5,8.5,-77,8.5,-76,9.5,-75.5,9.5,-75.5,10,-75.5,10.5,-75,11,-74.5,11,-74,11.5,-73.5,11,-72.5,11.5,-72,12,-72,12.5,-71.5,12.5,-71,12,-71.5,12,-72,11.5,-72,11,-72.5,11,-73,10.5,-73,9.5,-73.5,9,-73,9,-72.5,8.5,-72.5,8,-72.5,7.5,-72,7.5,-72,7,-70.5,7,-70,7,-69.5,6,-69,6,-68.5,6,-67.5,6.5,-67.5,6,-67.5,5.5,-67.5,5,-68,4.5,-67.5,4,-67.5,3.5,-68,3,-67.5,2.5,-67,2.5,-67,1.5],[-77.5,8.5,-77,8,-77.5,7.5,-78,7.5,-78,7,-78,7.5,-78.5,8,-78,8.5,-78.5,8.5,-79,9,-79.5,9,-80,8.5,-80.5,8.5,-80.5,8,-80,7.5,-80.5,7.5,-81,7,-81,8,-81,7.5,-81.5,7.5,-81.5,8,-82,8,-82.5,8.5,-83,8.5,-83,8,-83,8.5,-83,9,-82.5,9,-83,9,-83,9.5,-82.5,9.5,-82,9,-81.5,9,-81,9,-80.5,9,-80,9.5,-79.5,9.5,-79,9.5,-78.5,9.5,-78,9,-77.5,9,-77.5,8.5],[-82.5,9.5,-83,9.5,-83,9,-82.5,9,-83,9,-83,8.5,-83,8,-83.5,8.5,-83.5,9,-84,9.5,-84.5,9.5,-84.5,10,-85,10,-85,9.5,-85.5,10,-86,10,-86,10.5,-85.5,11,-86,11,-85.5,11,-85,11,-84.5,11,-84,11,-84,10.5,-83.5,11,-83.5,10.5,-83,10,-82.5,9.5],[-83.5,11,-84,10.5,-84,11,-84.5,11,-85,11,-85.5,11,-86,11.5,-86.5,12,-87,12.5,-87.5,13,-87,13,-87,13.5,-86.5,13.5,-87,14,-86.5,14,-86,14,-85.5,14,-85,14.5,-85,15,-84.5,14.5,-84,14.5,-83.5,15,-83,15,-83.5,14.5,-83,14.5,-83.5,14,-83.5,13.5,-83.5,13,-83.5,12.5,-83.5,12,-83.5,11.5,-84,11.5,-84,11,-83.5,11],[-83,15,-83.5,15,-84,14.5,-84.5,14.5,-85,15,-85,14.5,-85.5,14,-86,14,-86.5,14,-87,14,-86.5,13.5,-87,13.5,-87,13,-87.5,13,-87.5,13.5,-88,13.5,-87.5,14,-88,14,-88.5,14,-89,14,-89,14.5,-89.5,14.5,-89,14.5,-89,15,-88.5,15.5,-88,15.5,-88,16,-87.5,16,-87,16,-86.5,16,-86,16,-85.5,16,-85,16,-84.5,16,-84,15.5,-83.5,15.5,-83,15],[-89.5,14.5,-89,14.5,-89,14,-88.5,14,-88,14,-87.5,14,-88,13.5,-88,13,-88.5,13,-89,13.5,-89.5,13.5,-90,13.5,-90,14,-89.5,14,-89.5,14.5],[-92,14.5,-92,15,-92,15.5,-91.5,16,-90.5,16,-90.5,16.5,-91,17,-91.5,17.5,-91,17.5,-91,18,-90,18,-89,18,-89,17,-89,16,-88.5,15.5,-88.5,16,-88,15.5,-88.5,15.5,-89,15,-89,14.5,-89.5,14.5,-89.5,14,-90,14,-90,13.5,-90.5,14,-91,14,-91.5,14,-92,14.5],[-89,18,-88.5,18.5,-88,18.5,-88,18,-88.5,17.5,-88,17.5,-88.5,17,-88,17,-88.5,16.5,-88.5,16,-89,16,-89,17,-89,18],[-60.5,5,-61,4.5,-62,4,-63,4,-64,4,-64.5,4,-65,4,-64.5,4,-64.5,3,-64.5,2.5,-63.5,2.5,-63.5,2,-64,2,-64,1.5,-64.5,1.5,-65.5,1,-66.5,0.5,-67,1.5,-67,2.5,-67.5,2.5,-68,3,-67.5,3.5,-67.5,4,-68,4.5,-67.5,5,-67.5,5.5,-67.5,6,-67.5,6.5,-68.5,6,-69,6,-69.5,6,-70,7,-70.5,7,-72,7,-72,7.5,-72.5,7.5,-72.5,8,-72.5,8.5,-73,9,-73.5,9,-73,9.5,-73,10.5,-72.5,11,-72,11,-72,11.5,-71.5,12,-71.5,11.5,-72,11.5,-71.5,11,-71.5,10.5,-72,10,-71.5,9,-71,10,-71.5,10,-71.5,11,-70,11.5,-70.5,12,-70,12,-69.5,11.5,-69,11.5,-68,11,-68,10.5,-67.5,10.5,-66,10.5,-65.5,10,-65,10,-64.5,10.5,-63,10.5,-62,10.5,-62.5,10.5,-62.5,10,-61.5,10,-61,9.5,-60.5,8.5,-60,8.5,-60.5,8,-60.5,7.5,-60.5,7,-61,6.5,-61,6,-61.5,6,-60.5,5],[-56.5,2,-57,2,-57.5,2,-57.5,1.5,-58,1.5,-58.5,1.5,-59,1.5,-59.5,2,-60,3,-60,3.5,-59.5,4,-60,4.5,-60,5,-60.5,5,-61.5,6,-61,6,-61,6.5,-60.5,7,-60.5,7.5,-60.5,8,-60,8.5,-59,8,-58.5,7.5,-58.5,7,-58,7,-57.5,6.5,-57,6,-57.5,5,-58,5,-58,4.5,-58,4,-57.5,3.5,-57,3,-56.5,2],[-54.5,2.5,-55,2.5,-55.5,2.5,-56,2.5,-56,2,-56.5,2,-57,3,-57.5,3.5,-58,4,-58,4.5,-58,5,-57.5,5,-57,6,-56,6,-55,6,-54,6,-54.5,5,-54.5,4,-54,3.5,-54,3,-54.5,2.5],[-51.5,4,-52,3,-52.5,2.5,-53,2,-53.5,2,-53.5,2.5,-54,2.5,-54,2,-54.5,2.5,-54,3,-54,3.5,-54.5,4,-54.5,5,-54,6,-53.5,5.5,-53,5.5,-52,4.5,-51.5,4],[6,49.5,6.5,49,8,49,7.5,48.5,7.5,47.5,7,47.5,6.5,47.5,7,47.5,6,46.5,6.5,46.5,7,46,7,45.5,6.5,45,7,44.5,7.5,44,7.5,43.5,6.5,43,4.5,43.5,3,43,3,42.5,2,42.5,0.5,43,0.5,42.5,-1.5,43,-2,43.5,-1.5,44,-1,46,-2,47,-3,47.5,-4.5,48,-4.5,48.5,-3.5,49,-1.5,48.5,-2,50,-1,49.5,1.5,50,1.5,51,2.5,51,3,51,3.5,50.5,4.5,50,5,50,5.5,49.5,6,49.5],[-75.5,0,-75,-1,-75.5,-1.5,-76.5,-2.5,-78,-3,-78.5,-4,-78.5,-4.5,-79,-5,-79.5,-4.5,-80,-4.5,-80.5,-4.5,-80.5,-4,-80,-4,-80.5,-3.5,-80,-2.5,-80,-2,-80.5,-2.5,-81,-2,-81,-1,-80.5,-1,-80.5,-0.5,-80,0.5,-80,1,-79.5,1,-79,1.5,-78,1,-77.5,1,-77.5,0.5,-76.5,0.5,-76,0,-75.5,0],[-77.5,18.5,-77,18.5,-76.5,18,-76,18,-77,18,-77,17.5,-78,18,-78.5,18,-78,18.5,-77.5,18.5],[-82.5,23,-81.5,23,-80.5,23,-79.5,23,-79.5,22.5,-78.5,22.5,-78,22.5,-77,21.5,-76.5,21,-76,21,-75.5,21,-75.5,20.5,-75,20.5,-74,20.5,-74.5,20,-75,20,-75.5,20,-76.5,20,-78,20,-77,20.5,-77.5,20.5,-78,20.5,-78.5,21,-78.5,21.5,-79.5,21.5,-80,22,-80.5,22,-82,22,-82,22.5,-83,22.5,-83.5,22,-84,22,-84.5,22,-85,22,-84.5,22,-84,22.5,-84,23,-83.5,23,-82.5,23],[31,-22.5,30.5,-22,30.5,-22.5,30,-22,29.5,-22,29,-21.5,28,-21.5,27.5,-21,27.5,-20.5,26,-19.5,26,-18.5,25.5,-18.5,25.5,-17.5,26.5,-18,27,-18,27.5,-17.5,28.5,-16.5,29,-16.5,29,-16,29.5,-15.5,30.5,-15.5,30.5,-16,31,-16,31.5,-16,32,-16.5,32.5,-16.5,33,-16.5,33,-18,32.5,-18.5,32.5,-19.5,33,-19.5,32.5,-20.5,32,-21,31,-22.5],[29.5,-22,28,-23,27,-23.5,27,-24,26.5,-24.5,26,-24.5,26,-25,25.5,-25.5,25,-25.5,24,-25.5,23.5,-25.5,23,-25.5,22.5,-26,22,-26.5,21.5,-26.5,21,-27,20.5,-26.5,21,-26,20,-25,20,-22,21,-22,21,-18.5,21.5,-18,23,-18,23.5,-18.5,24,-18,24.5,-18,25,-17.5,25.5,-17.5,25.5,-18.5,26,-18.5,26,-19.5,27.5,-20.5,27.5,-21,28,-21.5,29,-21.5,29.5,-22],[20,-25,20,-28.5,19,-29,18.5,-29,18,-29,17.5,-29,17,-28.5,17,-28,16.5,-28.5,15.5,-28,15,-27,15,-26,14.5,-25.5,14.5,-24,14.5,-22.5,14.5,-22,14,-21.5,13.5,-21,13,-19.5,12.5,-19,12,-18,11.5,-17.5,12,-17,13,-17,13.5,-17,14,-17.5,18.5,-17.5,19,-18,21.5,-18,23,-17.5,24,-17.5,24.5,-17.5,25,-17.5,24.5,-18,24,-18,23.5,-18.5,23,-18,21.5,-18,21,-18.5,21,-22,20,-22,20,-25],[-16.5,13.5,-17,14.5,-17.5,14.5,-17,15,-16.5,15.5,-16.5,16,-16,16.5,-15.5,16.5,-15,16.5,-14.5,16.5,-14,16.5,-13.5,16,-13,15.5,-12,14.5,-12,14,-12,13.5,-11.5,13,-11.5,12.5,-12,12.5,-12.5,12.5,-13,12.5,-13.5,12.5,-15.5,12.5,-16,12.5,-16.5,12.5,-17,13,-16,13,-15.5,13.5,-15,13.5,-14.5,13.5,-14,13.5,-14,14,-14.5,13.5,-15,14,-15.5,14,-15.5,13.5,-16.5,13.5],[-11.5,12.5,-11.5,13,-12,13.5,-12,14,-12,14.5,-12,15,-11.5,15.5,-10.5,15,-10,15.5,-9.5,15.5,-5.5,15.5,-5.5,16,-5.5,16.5,-6,20.5,-6.5,25,-5,25,-1.5,23,2,20.5,2,20,2.5,20,3,19.5,3,19,4.5,19,4.5,17,3.5,16,3.5,15.5,2.5,15.5,1.5,15.5,1,15,0.5,15,-0.5,15,-1,15,-2,14.5,-2,14,-3,14,-3,13.5,-3.5,13.5,-4,13.5,-4.5,13,-4.5,12.5,-5,11.5,-5.5,11,-5.5,10.5,-6,10,-6,10.5,-6.5,10.5,-7,10,-7.5,10,-8,10.5,-8,10,-8.5,10.5,-8.5,11,-8.5,11.5,-9,12,-9,12.5,-9.5,12.5,-9.5,12,-10,12,-10.5,12,-11,12,-11.5,12,-11.5,12.5],[-17,21,-17,21.5,-13,21.5,-13,23,-13,23.5,-12,23.5,-12,26,-8.5,26,-8.5,27.5,-5,25,-6.5,25,-6,20.5,-5.5,16.5,-5.5,16,-5.5,15.5,-9.5,15.5,-10,15.5,-10.5,15,-11.5,15.5,-12,15,-12,14.5,-13,15.5,-13.5,16,-14,16.5,-14.5,16.5,-15,16.5,-15.5,16.5,-16,16.5,-16.5,16,-16.5,16.5,-16.5,17,-16,18,-16.5,19,-16.5,19.5,-16.5,20,-16.5,20.5,-17,21],[2.5,6.5,2,6,1.5,7,1.5,9,1.5,9.5,1.5,10,1,10,1,10.5,1,11,1.5,11.5,2,11.5,2,12,2.5,12,3,12,3.5,11.5,4,10.5,3.5,10.5,3.5,10,3,9.5,3,9,2.5,8.5,2.5,8,2.5,6.5],[15,23,15,21.5,15.5,21,15.5,20.5,16,20.5,15.5,20,15.5,18,15,16.5,14,15.5,13.5,14.5,14,14,14,13.5,14.5,13.5,14.5,13,14,13,14,12.5,13.5,13.5,13,13.5,12.5,13,11.5,13.5,11,13.5,10.5,13,10,13.5,9.5,13,9,13,8,13.5,7.5,13,7,13,6.5,13.5,5.5,14,4.5,13.5,4,13.5,4,13,3.5,12.5,3.5,11.5,3,12,2.5,12,2,12,2,12.5,1,13,1,13.5,0.5,14,0.5,14.5,0.5,15,1,15,1.5,15.5,2.5,15.5,3.5,15.5,3.5,16,4.5,17,4.5,19,5.5,19.5,8.5,21.5,12,23.5,13.5,23,14,22.5,15,23],[2.5,6.5,2.5,8,2.5,8.5,3,9,3,9.5,3.5,10,3.5,10.5,4,10.5,3.5,11.5,3.5,12.5,4,13,4,13.5,4.5,13.5,5.5,14,6.5,13.5,7,13,7.5,13,8,13.5,9,13,9.5,13,10,13.5,10.5,13,11,13.5,11.5,13.5,12.5,13,13,13.5,13.5,13.5,14,12.5,14.5,12,14.5,11.5,13.5,11,13.5,10,13,9.5,13,8.5,12,8.5,12,8,12,7.5,11.5,7,11,6.5,10.5,7,10,7,9.5,6.5,9,6.5,9,5.5,8.5,5,7.5,4.5,7,4.5,6.5,4,6,4.5,5.5,5,5,5.5,4.5,6.5,3.5,6.5,2.5,6.5],[14.5,13,15,12,15,11.5,15,11,15.5,10,15,10,14.5,10,14,10,14,9.5,14.5,9,15,9,15,8.5,15.5,7.5,15,6.5,14.5,6,14.5,5.5,14.5,5,14.5,4.5,15,4,15.5,3.5,16,3,16,2.5,16,1.5,15,2,14.5,2,13,2.5,12.5,2,12,2.5,11.5,2.5,9.5,2.5,10,3,9.5,3.5,9,4,8.5,4.5,8.5,5,9,5.5,9,6.5,9.5,6.5,10,7,10.5,7,11,6.5,11.5,7,12,7.5,12,8,12,8.5,13,8.5,13,9.5,13.5,10,13.5,11,14.5,11.5,14.5,12,14,12.5,14,13,14.5,13],[1,11,1,10.5,1,10,1.5,10,1.5,9.5,1.5,9,1.5,7,2,6,1,6,1,6.5,0.5,7,0.5,7.5,0.5,8.5,0.5,9.5,0.5,10,0,10.5,0,11,1,11],[0,11,0,10.5,0.5,10,0.5,9.5,0.5,8.5,0.5,7.5,0.5,7,1,6.5,1,6,-0.5,5.5,-1,5,-2,4.5,-3,5,-3,5.5,-3,6.5,-3,7.5,-2.5,8,-3,9.5,-3,10.5,-3,11,-1,11,-0.5,11,0,11],[-8,10,-8,10.5,-7.5,10,-7,10,-6.5,10.5,-6,10.5,-6,10,-5.5,10.5,-5,10,-4.5,9.5,-4,10,-3.5,10,-3,9.5,-2.5,8,-3,7.5,-3,6.5,-3,5.5,-3,5,-3.5,5,-4,5,-4.5,5,-6,5,-6.5,4.5,-7.5,4.5,-7.5,5,-7.5,5.5,-8,6,-8.5,6,-8.5,6.5,-8.5,7,-8.5,7.5,-8,8,-8.5,8.5,-8,8.5,-8,9.5,-8.5,10,-8,10],[-13.5,12.5,-13,12.5,-12.5,12.5,-12,12.5,-11.5,12.5,-11.5,12,-11,12,-10.5,12,-10,12,-9.5,12,-9.5,12.5,-9,12.5,-9,12,-8.5,11.5,-8.5,11,-8.5,10.5,-8,10,-8.5,10,-8,9.5,-8,8.5,-8.5,8.5,-8,8,-8.5,7.5,-9,7.5,-9.5,7.5,-9.5,8,-10,8.5,-10.5,8.5,-10.5,9,-10.5,9.5,-11,9.5,-11,10,-12,10,-12.5,10,-12.5,9.5,-13,9,-13.5,9.5,-14,10,-14.5,10,-14.5,10.5,-15,11,-14.5,11.5,-14,11.5,-13.5,12,-14,12,-13.5,12,-13.5,12.5],[-16.5,12.5,-16,12.5,-15.5,12.5,-13.5,12.5,-13.5,12,-14,12,-13.5,12,-14,11.5,-14.5,11.5,-15,11,-15.5,11.5,-16,11.5,-16.5,12,-16.5,12.5],[-8.5,7.5,-8.5,7,-8.5,6.5,-8.5,6,-8,6,-7.5,5.5,-7.5,5,-7.5,4.5,-8,4.5,-9,5,-10,5.5,-11,6,-11.5,7,-11,7,-11,7.5,-10.5,8,-10,8.5,-9.5,8,-9.5,7.5,-9,7.5,-8.5,7.5],[-13,9,-12.5,9.5,-12.5,10,-12,10,-11,10,-11,9.5,-10.5,9.5,-10.5,9,-10.5,8.5,-10,8.5,-10.5,8,-11,7.5,-11,7,-11.5,7,-12.5,7.5,-13,8,-13,9],[-5.5,10.5,-5.5,11,-5,11.5,-4.5,12.5,-4.5,13,-4,13.5,-3.5,13.5,-3,13.5,-3,14,-2,14,-2,14.5,-1,15,-0.5,15,0.5,15,0.5,14.5,0.5,14,1,13.5,1,13,2,12.5,2,12,2,11.5,1.5,11.5,1,11,0,11,-0.5,11,-1,11,-3,11,-3,10.5,-3,9.5,-3.5,10,-4,10,-4.5,9.5,-5,10,-5.5,10.5],[27.5,5,27,5,26.5,5,25.5,5.5,25.5,5,25,5,24.5,5,23.5,4.5,23,4.5,22.5,4.5,22.5,4,21.5,4,21,4.5,20.5,4.5,19.5,5,19,4.5,18.5,4,18.5,3.5,18,3.5,17,3.5,16.5,3,16,2.5,16,3,15.5,3.5,15,4,14.5,4.5,14.5,5,14.5,5.5,14.5,6,15,6.5,15.5,7.5,16,7.5,16.5,8,16.5,7.5,18,8,18.5,8.5,19,8.5,19,9,20,9,21,9.5,21.5,10.5,22,11,23,11,23,10.5,23.5,10,23.5,9.5,23.5,9,24,8.5,24.5,8,25,8,25,7.5,26,7,26,6.5,26.5,6,27,5.5,27.5,5],[18.5,3.5,18.5,3,18,2.5,18,1.5,18,1,18,0.5,17.5,0,17.5,-0.5,17,-1,16.5,-1.5,16,-2.5,16,-3.5,16,-4,15,-4.5,14.5,-5,14,-5,14,-4.5,13.5,-4.5,13.5,-5,13,-5,12.5,-4.5,12,-5,11,-4,12,-3.5,11.5,-3,12,-2.5,12.5,-2.5,12.5,-2,13,-2.5,14,-2.5,14.5,-2,14.5,-1.5,14.5,-0.5,14,0,14.5,1,14,1.5,13.5,1.5,13,2,13,2.5,14.5,2,15,2,16,1.5,16,2.5,16.5,3,17,3.5,18,3.5,18.5,3.5],[11.5,2.5,12,2.5,12.5,2,13,2.5,13,2,13.5,1.5,14,1.5,14.5,1,14,0,14.5,-0.5,14.5,-1.5,14.5,-2,14,-2.5,13,-2.5,12.5,-2,12.5,-2.5,12,-2.5,11.5,-3,12,-3.5,11,-4,10,-3,9.5,-2,9,-1,9,-0.5,9.5,0.5,9.5,1,10,1,11.5,1,11.5,2.5],[9.5,2.5,11.5,2.5,11.5,1,10,1,9.5,1,9.5,2.5],[30.5,-8.5,31,-8.5,31.5,-9,32,-9,33,-9,33,-9.5,33.5,-10.5,33.5,-11,33,-11.5,33.5,-12.5,33,-13,32.5,-13.5,33,-14,30,-15,30.5,-15.5,29.5,-15.5,29,-16,29,-16.5,28.5,-16.5,27.5,-17.5,27,-18,26.5,-18,25.5,-17.5,25,-17.5,24.5,-17.5,24,-17.5,23,-17.5,22.5,-17,22,-16,22,-13,24,-13,24,-12.5,24,-12,24,-11.5,24,-11,24.5,-11,24.5,-11.5,25,-11,25.5,-11.5,26,-12,26.5,-12,27,-11.5,27.5,-12,28,-12.5,28.5,-12.5,29,-13,29.5,-13.5,29.5,-12,29.5,-12.5,28.5,-12,28.5,-11,28.5,-9.5,28.5,-9,28.5,-8.5,29,-8.5,30.5,-8,30.5,-8.5],[33,-9,33.5,-9.5,34,-9.5,34.5,-10,34.5,-11.5,34.5,-12.5,34.5,-13.5,35,-13.5,35.5,-14,35.5,-14.5,36,-16,35.5,-16,35,-17,34.5,-16,34.5,-15.5,34.5,-15,34.5,-14.5,34,-14.5,33,-14,32.5,-13.5,33,-13,33.5,-12.5,33,-11.5,33.5,-11,33.5,-10.5,33,-9.5,33,-9],[34.5,-11.5,35.5,-11.5,36.5,-11.5,37,-11.5,37.5,-11.5,38,-11.5,38.5,-11.5,39.5,-11,40.5,-10.5,40.5,-11,40.5,-12,40.5,-12.5,40.5,-14,41,-14.5,40.5,-15.5,40,-16,39.5,-16.5,38.5,-17,37.5,-17.5,36.5,-18.5,36,-19,35,-19.5,35,-20,34.5,-20.5,35,-21.5,35.5,-22,35.5,-23,35.5,-23.5,35.5,-24,35,-24.5,34,-25,33,-25.5,32.5,-25.5,32.5,-26,33,-26,33,-26.5,32,-26.5,32,-26,32,-25.5,32,-24.5,31.5,-23.5,31,-22.5,32,-21,32.5,-20.5,33,-19.5,32.5,-19.5,32.5,-18.5,33,-18,33,-16.5,32.5,-16.5,32,-16.5,31.5,-16,31,-16,30.5,-16,30.5,-15.5,30,-15,33,-14,34,-14.5,34.5,-14.5,34.5,-15,34.5,-15.5,34.5,-16,35,-17,35.5,-16,36,-16,35.5,-14.5,35.5,-14,35,-13.5,34.5,-13.5,34.5,-12.5,34.5,-11.5],[32,-26.5,32,-27,31.5,-27.5,30.5,-26.5,31,-26,31,-25.5,31.5,-25.5,32,-26,32,-26.5],[12.5,-6,13,-6,13.5,-6,16.5,-6,16.5,-6.5,17,-7,17,-7.5,17.5,-8,18,-8,18.5,-8,19,-8,19,-7.5,19.5,-7,20,-7,20.5,-7,20.5,-7.5,21.5,-7.5,21.5,-8,22,-8.5,22,-9,22,-9.5,22,-10,22,-11,22.5,-11,23,-11,23.5,-11,24,-11,24,-11.5,24,-12,24,-12.5,24,-13,22,-13,22,-16,22.5,-17,23,-17.5,21.5,-18,19,-18,18.5,-17.5,14,-17.5,13.5,-17,13,-17,12,-17,11.5,-17.5,11.5,-16.5,12,-16,12,-15,12,-14.5,12.5,-13.5,12.5,-13,13.5,-12.5,13.5,-12,13.5,-11.5,13.5,-10.5,13,-10,13,-9,13,-8.5,13,-7.5,12.5,-7,12,-6.5,12.5,-6],[30.5,-2.5,30.5,-3,31,-3.5,30.5,-3.5,30,-4,30,-4.5,29.5,-4.5,29.5,-3.5,29,-3,29.5,-3,30,-2.5,30.5,-2.5],[35.5,32.5,35,32.5,35,32,35,31.5,35.5,31.5,35.5,31,35,29.5,35,30,34.5,31,34.5,31.5,35,32,35,33,35.5,33,35.5,33.5,36,33.5,36,33,35.5,32.5],[49.5,-12.5,50,-13,50,-13.5,50,-15,50.5,-15,50.5,-15.5,50,-16,50,-15.5,49.5,-15.5,50,-16.5,50,-17,49.5,-17,49.5,-18,49,-19,48.5,-20.5,48,-22.5,47.5,-24,47,-25,46.5,-25,45.5,-25.5,45,-25.5,44,-25,44,-24.5,43.5,-23.5,43.5,-23,43.5,-22,43.5,-21.5,44,-21,44.5,-20,44.5,-19.5,44,-19,44,-18.5,44,-17.5,44.5,-17,44.5,-16,45,-16,45.5,-16,46,-16,46.5,-16,47,-15,47.5,-14.5,48,-14,48,-13.5,48.5,-14,49,-13,49,-12.5,49,-12,49.5,-12.5],[-16.5,13.5,-15.5,13.5,-15.5,14,-15,14,-14.5,13.5,-14,14,-14,13.5,-14.5,13.5,-15,13.5,-15.5,13.5,-16,13,-17,13,-16.5,13.5],[9.5,30.5,9,32,8.5,32.5,7.5,33.5,7.5,34,8,34.5,8.5,35.5,8,36.5,8.5,37,9.5,37.5,10,37,10,36.5,11,37,10.5,36.5,10.5,36,11,35.5,11,35,10,34.5,10.5,34,11,34,11,33.5,11.5,33,11.5,32.5,11,32,10.5,32,10,31.5,10,31,10,30.5,9.5,30.5],[-8.5,27.5,-8.5,29,-7,29.5,-6,29.5,-5,30,-5,30.5,-3.5,31,-3.5,31.5,-3,31.5,-2.5,32,-1.5,32.5,-1,32.5,-1.5,33,-1.5,34,-2,34.5,-2,35,-1,35.5,0,36,0.5,36.5,1.5,36.5,3,37,5,37,5.5,36.5,6.5,37,7.5,37,8.5,37,8,36.5,8.5,35.5,8,34.5,7.5,34,7.5,33.5,8.5,32.5,9,32,9.5,30.5,10,29.5,10,29,9.5,28,10,27.5,9.5,27,9.5,26.5,9.5,26,10,25.5,10,25,10.5,24.5,11,24.5,11.5,24,12,23.5,8.5,21.5,5.5,19.5,4.5,19,3,19,3,19.5,2.5,20,2,20,2,20.5,-1.5,23,-5,25,-8.5,27.5],[35.5,32.5,37,32.5,39,33.5,39,32,37,31.5,38,30.5,37.5,30.5,37.5,30,36.5,30,36.5,29.5,36,29,35,29.5,35.5,31,35.5,31.5,35.5,32,35.5,32.5],[51.5,24,52,24.5,52,24,52.5,24,53.5,24,54,24,54.5,25,55.5,25.5,56,26,56.5,25.5,56.5,25,56,25,56,24.5,56,24,55.5,24,55.5,23.5,55,23,55,22.5,52,23,51.5,24],[48,30,48,29.5,48.5,28.5,47.5,28.5,47.5,29,46.5,29,47.5,30,48,30],[39,32,39,33.5,41,34.5,41.5,35.5,41.5,36.5,42,36.5,42.5,37,43,37.5,44,37.5,44.5,37,45,37,45.5,36,46,35.5,46,35,45.5,34.5,45.5,34,46,33,47.5,32.5,48,31.5,47.5,31,48,31,48,30.5,48.5,30,48,30,47.5,30,46.5,29,44.5,29,42,31,40.5,32,39,32],[55,22.5,55,23,55.5,23.5,55.5,24,56,24,56,24.5,56,25,56.5,25,57,24,57.5,24,58,23.5,58.5,23.5,59,23,59.5,22.5,60,22.5,59.5,21.5,59,21,58.5,20.5,58,20.5,58,20,57.5,19.5,58,19,57.5,19,57,19,56.5,18.5,56.5,18,55.5,18,55.5,17.5,55.5,17,55,17,54,17,53.5,16.5,53,16.5,53,17.5,52,19,55,20,55.5,22,55,22.5],[102.5,12,102.5,13.5,103,14,104.5,14.5,105,14.5,106,14,106.5,14.5,107.5,14,107.5,13.5,107.5,12.5,106,11.5,106,11,105,11,104.5,10.5,103.5,10.5,103,11,102.5,12],[105,14.5,104.5,14.5,103,14,102.5,13.5,102.5,12,101.5,12.5,101,12.5,101,13.5,100,13.5,100,12.5,99.5,11,99,10,99,9,100,9,100.5,8.5,100.5,7.5,101,7,101.5,6.5,102,6,101,5.5,101,6,100.5,6.5,100,6.5,99.5,7,99.5,7.5,99,8,98.5,8.5,98.5,8,98,8.5,98.5,9,98.5,10,99,11,99.5,12,99,13,99,13.5,99,14,98.5,14.5,98,15,98.5,15.5,99,16,98.5,17,98,17.5,97.5,18.5,98,18.5,98.5,19.5,99,20,99.5,20,100,20.5,100.5,20,100.5,19.5,101.5,19.5,101,18.5,101,17.5,102,18,102.5,18,103,18,103,18.5,104,18,104.5,17.5,105,16.5,105.5,15.5,105.5,14.5,105,14.5],[107.5,14,106.5,14.5,106,14,105,14.5,105.5,14.5,105.5,15.5,105,16.5,104.5,17.5,104,18,103,18.5,103,18,102.5,18,102,18,101,17.5,101,18.5,101.5,19.5,100.5,19.5,100.5,20,100,20.5,100.5,21,101,21.5,101.5,21,102,21,101.5,22.5,102,22.5,103,21.5,103,21,104.5,21,105,20,104,19.5,105,18.5,106,17.5,106.5,16.5,107.5,16,107.5,15,107.5,14],[100,20.5,99.5,20,99,20,98.5,19.5,98,18.5,97.5,18.5,98,17.5,98.5,17,99,16,98.5,15.5,98,15,98.5,14.5,99,14,99,13.5,99,13,99.5,12,99,11,98.5,10,98.5,10.5,99,11.5,98.5,12,98.5,13,98,13.5,98,15,97.5,16,97,17,96.5,16.5,95.5,15.5,95,16,94,16,94.5,17.5,94.5,18,93.5,19.5,93,20,92.5,20.5,92.5,21.5,92.5,22,93,22.5,93.5,23,93.5,24,94,24,94.5,24.5,94.5,25,95,26,95,26.5,96.5,27.5,97,27,97,27.5,97.5,28,97.5,28.5,98,28.5,98,27.5,98.5,27.5,98.5,26.5,98.5,26,97.5,25,97.5,24,98.5,24,99,23,99.5,23,99,22,100,21.5,100.5,21.5,101,22,101,21.5,100.5,21,100,20.5],[104.5,10.5,105,11,106,11,106,11.5,107.5,12.5,107.5,13.5,107.5,14,107.5,15,107.5,16,106.5,16.5,106,17.5,105,18.5,104,19.5,105,20,104.5,21,103,21,103,21.5,102,22.5,102.5,22.5,103.5,22.5,104.5,23,105.5,23.5,106,23,106.5,23,106.5,22,107,22,108,21.5,106.5,20.5,106,20,105.5,19,106.5,18,107.5,16.5,108.5,16,109,15.5,109.5,13.5,109,11.5,108.5,11,107,10.5,106.5,9.5,105,8.5,105,9,105,10,104.5,10.5],[130.5,42.5,131,42,130.5,42.5,130,42,129.5,41.5,129.5,41,129,40.5,128.5,40,128,40,127.5,40,127.5,39.5,127.5,39,128,39,128.5,38.5,128,38.5,127,38.5,126.5,38,126,38,126,37.5,125.5,38,125.5,37.5,125,38,124.5,38,125,38.5,125,39,125.5,39.5,124.5,39.5,124.5,40,125,40.5,126,41,127,42,127.5,41.5,128,41.5,128,42,129.5,42.5,130,43,130.5,42.5],[126,37.5,126,38,126.5,38,127,38.5,128,38.5,128.5,38.5,129,37.5,129.5,37,129.5,35.5,129,35,128,35,127.5,34.5,126.5,34.5,126.5,35,126.5,35.5,126,36.5,127,37,126,37.5],[88,49.5,89,49.5,90.5,50.5,92,51,93,50.5,94,50.5,95,50,96,50,97.5,49.5,98,50.5,98,51,99,52,100,51.5,101,51.5,102,51.5,102.5,50.5,103.5,50,104.5,50.5,106,50.5,107,50.5,108,50,108.5,49.5,109.5,49.5,110.5,49,111.5,49.5,113,49.5,114.5,50,115,50,115.5,50,116.5,50,116,49,115.5,48,115.5,47.5,116.5,48,117.5,47.5,118,48,119,47.5,120,47,119.5,46.5,119,47,117.5,46.5,116.5,46.5,116,45.5,114.5,45.5,113.5,45,112.5,45,112,45,111.5,44.5,111.5,44,112,43.5,111,43.5,110.5,43,109,42.5,107.5,42.5,106,42,105,41.5,104.5,42,103.5,42,102,42.5,101,42.5,99.5,42.5,97.5,42.5,96.5,42.5,96,43.5,95.5,44,94.5,44.5,93.5,45,92,45,91,45.5,90.5,45.5,91,47,90.5,47.5,89,48,88,48.5,88,49.5],[97.5,28.5,97.5,28,97,27.5,97,27,96.5,27.5,95,26.5,95,26,94.5,25,94.5,24.5,94,24,93.5,24,93.5,23,93,22.5,92.5,22,92,23.5,91.5,23,91,23.5,91.5,24,92,24,92.5,25,92,25,91,25,90,25.5,90,26,89.5,26,88.5,26.5,88,26,89,25,88.5,25,88,24.5,88.5,24,88.5,23.5,89,23,89,22,89,21.5,88,21.5,87,21.5,87,20.5,86.5,20,85,19.5,84,18.5,83,17.5,82,17,82,16.5,81.5,16.5,81,16,80.5,16,80,15,80,14,80.5,13,80,12,80,10.5,79.5,10.5,79,9.5,79,9,78.5,9,78,8.5,77.5,8,76.5,9,76,10.5,75.5,11.5,75.5,12,75,12.5,74.5,14,74.5,14.5,73.5,16,73,18,73,19,73,20.5,72.5,21.5,71,21,70.5,21,69,22,69.5,22.5,69.5,23,68,23.5,69,24.5,71,24.5,71,25,70.5,25.5,70,26.5,69.5,27,70.5,28,72,28,73,29,73.5,30,74.5,31,74.5,31.5,75.5,32.5,74.5,33,74,33.5,73.5,34.5,74,34.5,76,34.5,77,34.5,78,35.5,79,34.5,79,33.5,79,33,79,32.5,78.5,32.5,78.5,31.5,79.5,31,81,30,80.5,29.5,80,29,81,28.5,82,28,83.5,27.5,84.5,27,85.5,26.5,86,26.5,87,26.5,88,26.5,88,27,88,27.5,88,28,88.5,28,89,27.5,89,27,89.5,26.5,90.5,27,91,27,92,27,92,27.5,91.5,28,92.5,28,93.5,28.5,94.5,29.5,95.5,29,96,29.5,96.5,29,96,28.5,97.5,28.5],[92.5,22,92.5,21.5,92.5,20.5,92,21,92,21.5,92,22,91.5,23,90.5,23,90.5,22.5,90.5,22,90,22,89.5,22,89,22,89,23,88.5,23.5,88.5,24,88,24.5,88.5,25,89,25,88,26,88.5,26.5,89.5,26,90,26,90,25.5,91,25,92,25,92.5,25,92,24,91.5,24,91,23.5,91.5,23,92,23.5,92.5,22],[91.5,28,92,27.5,92,27,91,27,90.5,27,89.5,26.5,89,27,89,27.5,89.5,28,90,28.5,90.5,28,91.5,28],[88,28,88,27.5,88,27,88,26.5,87,26.5,86,26.5,85.5,26.5,84.5,27,83.5,27.5,82,28,81,28.5,80,29,80.5,29.5,81,30,81.5,30.5,82.5,30,83.5,29.5,84,29.5,84,29,85,28.5,86,28,87,28,88,28],[78,35.5,77,34.5,76,34.5,74,34.5,73.5,34.5,74,33.5,74.5,33,75.5,32.5,74.5,31.5,74.5,31,73.5,30,73,29,72,28,70.5,28,69.5,27,70,26.5,70.5,25.5,71,25,71,24.5,69,24.5,68,23.5,67.5,24,67,24.5,66.5,25.5,64.5,25,63,25,61.5,25,62,26,63.5,27,63,27,63,27.5,62.5,28.5,62,28.5,61.5,29.5,61,30,62.5,29.5,63.5,29.5,64,29.5,64.5,29.5,65,29.5,66.5,30,66.5,30.5,67,31.5,67.5,31.5,68,31.5,68.5,31.5,69,31.5,69.5,32,69.5,32.5,69.5,33,70.5,33.5,70,34,71,34,71,34.5,71.5,35,71.5,35.5,71.5,36,72,36.5,73,36.5,74,37,74.5,37,75,37,76,36.5,76,36,78,35.5],[66.5,37.5,67,37.5,68,37,69,37.5,69,37,69.5,37.5,70,37.5,70.5,37.5,70.5,38,71,38.5,71.5,38.5,71,38,71.5,38,71.5,37,72,36.5,72,37,72.5,37,73.5,37.5,74,37.5,75,37.5,75,37,74.5,37,74,37,73,36.5,72,36.5,71.5,36,71.5,35.5,71.5,35,71,34.5,71,34,70,34,70.5,33.5,69.5,33,69.5,32.5,69.5,32,69,31.5,68.5,31.5,68,31.5,67.5,31.5,67,31.5,66.5,30.5,66.5,30,65,29.5,64.5,29.5,64,29.5,63.5,29.5,62.5,29.5,61,30,62,30.5,61.5,31.5,61,31.5,61,32,60.5,33,61,33.5,60.5,33.5,61,34.5,61,35.5,62,35.5,63,35.5,63,36,64,36,64.5,36.5,64.5,37,65.5,37.5,66,37.5,66.5,37.5],[68,37,68.5,38,68,39,67.5,39,67.5,39.5,68.5,39.5,69,40,69.5,40.5,70.5,41,70.5,40.5,70.5,40,71,40,70.5,40,69.5,40,69.5,39.5,70.5,39.5,72,39.5,73.5,39.5,74,38.5,74.5,38.5,75,38.5,75,38,75,37.5,74,37.5,73.5,37.5,72.5,37,72,37,72,36.5,71.5,37,71.5,38,71,38,71.5,38.5,71,38.5,70.5,38,70.5,37.5,70,37.5,69.5,37.5,69,37,69,37.5,68,37],[71,42.5,72,43,73.5,42.5,73.5,43,74,43.5,75.5,43,76,43,77.5,43,79,43,79.5,42.5,80.5,42.5,80,42,78.5,41.5,78,41,77,41,76.5,40.5,75.5,40.5,75,40.5,74,40,74,39.5,73.5,39.5,72,39.5,70.5,39.5,69.5,39.5,69.5,40,70.5,40,71,40,72,40,73,41,72,41.5,71,41,70.5,41.5,71.5,42,71,42.5],[52.5,42,53,42,54,42.5,55,42,55.5,41.5,56,41.5,57,41.5,57,42,58,42,58.5,43,60,42,60,41.5,60.5,41,61.5,41.5,62,41,62.5,40,63.5,39.5,64,39,65,38.5,66.5,38,66.5,37.5,66,37.5,65.5,37.5,64.5,37,64.5,36.5,64,36,63,36,63,35.5,62,35.5,61,35.5,61,36.5,60.5,36.5,59,37.5,58.5,37.5,57.5,38,56.5,38,56,38,55.5,38,55,37.5,54,37,53.5,38,54,39,53,39.5,53.5,40,52.5,40,53,41,54,40.5,54.5,41,54,41.5,53.5,42,53,42,53,41,52.5,42],[48.5,30,48,30.5,48,31,47.5,31,48,31.5,47.5,32.5,46,33,45.5,34,45.5,34.5,46,35,46,35.5,45.5,36,45,37,44,38,44.5,38.5,44,39.5,45,39.5,45.5,39,46,38.5,46.5,39,47.5,39.5,48,39.5,48.5,39.5,48,39,48.5,38.5,49,38.5,49,37.5,50,37.5,51,37,52.5,36.5,54,37,55,37.5,55.5,38,56,38,56.5,38,57.5,38,58.5,37.5,59,37.5,60.5,36.5,61,36.5,61,35.5,61,34.5,60.5,33.5,61,33.5,60.5,33,61,32,61,31.5,61.5,31.5,62,30.5,61,30,61.5,29.5,62,28.5,62.5,28.5,63,27.5,63,27,63.5,27,62,26,61.5,25,59.5,25.5,58.5,25.5,57.5,25.5,57,27,56.5,27,55.5,27,54.5,26.5,53.5,27,52.5,27.5,51.5,28,51,29,50,30,49.5,30,49,30.5,48.5,30],[35.5,32.5,36,33,36,33.5,36,34,36.5,34,36.5,34.5,36,34.5,36,35.5,36,36,36.5,36,36.5,36.5,36.5,37,37,36.5,38,37,38.5,36.5,39.5,36.5,40.5,37,41,37,42.5,37,42,36.5,41.5,36.5,41.5,35.5,41,34.5,39,33.5,37,32.5,35.5,32.5],[46.5,39,46,38.5,45.5,39.5,45,39.5,44.5,40,43.5,40.5,44,40.5,43.5,41,45,41,45.5,41,45.5,40.5,46,40,45.5,40,46,39.5,46.5,39.5,46.5,39],[11,59,11.5,59.5,12.5,60,12.5,61.5,12,62,12,63,12.5,64,13.5,64,14,64.5,13.5,65,15,66,16,67.5,17,68,17.5,68,18,68.5,20,68.5,20,69,20.5,69,22,68.5,23.5,68,23.5,66.5,24,66,22,65.5,21,65,21.5,64.5,20,63.5,18,62.5,17,61.5,18,60.5,19,60,18,59,17,58.5,16.5,57,16,56,14.5,56,14,55.5,13,55.5,12.5,56.5,12,57.5,11,59],[28,56,29,56,29.5,55.5,30,56,31,55.5,31,55,31.5,54,32,54,31.5,54,32.5,53.5,32.5,53,31.5,53,31.5,52.5,32,52,31,52,30.5,52,30.5,51.5,30,51.5,29.5,51.5,29,51.5,28.5,51.5,28,51.5,27.5,51.5,26.5,52,25.5,52,24.5,52,24,51.5,23.5,51.5,23.5,52,23,52.5,24,52.5,24,53,23.5,53.5,23.5,54,24.5,54,25.5,54.5,26,55,26.5,55,26.5,55.5,27,56,28,56],[32,52,32.5,52.5,32.5,52,34,52.5,34.5,52,34,51.5,35,51,35.5,51,35.5,50.5,36.5,50,37.5,50.5,38,50,38.5,50,40,49.5,39.5,49,40,48,39.5,48,39,48,38.5,47.5,38,47,37.5,47,37,46.5,36,46.5,35,46.5,35,45.5,35,46,34.5,46,33.5,46,31.5,46.5,30.5,46.5,30.5,46,29.5,45.5,29,45.5,28.5,45.5,28,45.5,28.5,45.5,28.5,46,29,46.5,30,46.5,29.5,47,29.5,47.5,29,47.5,29,48,28.5,48,27.5,48.5,27,48.5,26.5,48,26,48,25,48,25,47.5,24.5,48,24,48,23,48,22.5,48,22,48.5,22.5,49,23,49,22.5,49.5,23.5,50.5,24,50.5,23.5,51.5,24,51.5,24.5,52,25.5,52,26.5,52,27.5,51.5,28,51.5,28.5,51.5,29,51.5,29.5,51.5,30,51.5,30.5,51.5,30.5,52,31,52,32,52],[23.5,54,23.5,53.5,24,53,24,52.5,23,52.5,23.5,52,23.5,51.5,24,50.5,23.5,50.5,22.5,49.5,23,49,22.5,49,21.5,49.5,21,49.5,20.5,49.5,20,49,19.5,49.5,19,49.5,18.5,50,17.5,50,17.5,50.5,17,50.5,16.5,50,16,50.5,15.5,51,15,51,14.5,51.5,14.5,52,14.5,52.5,14,53,14.5,53,14,54,15,54,16.5,54.5,17.5,55,18.5,54.5,19.5,54.5,21,54.5,22.5,54.5,23,54,23.5,54],[17,48,17,47.5,16.5,47.5,16,47,16,46.5,15,46.5,14.5,46.5,14,46.5,12.5,47,12,47,11,47,10.5,47,10,47,9.5,47,9.5,47.5,10,47.5,10.5,47.5,11.5,47.5,12,47.5,12.5,47.5,13,47.5,13,48.5,13.5,49,14.5,48.5,15,49,15.5,49,16,48.5,16.5,49,17,48.5,17,48],[22,48.5,22.5,48,22,47.5,21.5,47,21,46.5,20,46,19.5,46,19,46,18.5,46,17.5,46,17,46.5,16.5,46.5,16.5,47,16,47,16.5,47.5,17,47.5,17,48,17.5,48,18,48,18.5,48,19,48,19.5,48.5,20,48,20,48.5,20.5,48.5,21,48.5,22,48.5],[26.5,48,27,48.5,27.5,48.5,28.5,48,29,48,29,47.5,29.5,47.5,29.5,47,30,46.5,29,46.5,28.5,46,28.5,45.5,28,45.5,28,46,28,46.5,28,47,27.5,47.5,27,48,26.5,48],[28,45.5,28.5,45.5,29,45.5,29.5,45.5,29.5,45,29,45,28.5,43.5,28,44,27,44,26,44,25.5,43.5,24,43.5,23.5,44,23,44,22.5,44,22.5,44.5,22,44.5,21.5,45,21,45.5,20,46,21,46.5,21.5,47,22,47.5,22.5,48,23,48,24,48,24.5,48,25,47.5,25,48,26,48,26.5,48,27,48,27.5,47.5,28,47,28,46.5,28,46,28,45.5],[26.5,55.5,26.5,55,26,55,25.5,54.5,24.5,54,23.5,54,23,54,22.5,54.5,23,55,22.5,55,21.5,55,21,56,22,56.5,24,56.5,25,56.5,25,56,25.5,56,26.5,55.5],[27.5,57.5,28,57,28,56,27,56,26.5,55.5,25.5,56,25,56,25,56.5,24,56.5,22,56.5,21,56,21,57,21.5,57.5,22.5,58,23.5,57,24,57,24.5,58,25,58,25.5,58,26.5,57.5,27.5,57.5],[28,59.5,27.5,58.5,27.5,58,27.5,57.5,26.5,57.5,25.5,58,25,58,24.5,58,24.5,58.5,24,58.5,23.5,58.5,23.5,59,24.5,59.5,26,59.5,27,59.5,28,59.5],[14,54,14.5,53,14,53,14.5,52.5,14.5,52,14.5,51.5,15,51,14.5,51,14,51,13.5,50.5,13,50.5,12,50.5,12.5,50,12.5,49.5,13,49.5,13.5,49,13,48.5,13,47.5,12.5,47.5,12,47.5,11.5,47.5,10.5,47.5,10,47.5,9.5,47.5,8.5,48,8.5,47.5,7.5,47.5,7.5,48.5,8,49,6.5,49,6,49.5,6,50,6,51,6,52,6.5,52,7,52,7,53,7,53.5,8,53.5,9,54,8.5,54.5,8.5,55,9.5,55,10,55,10,54.5,11,54.5,11,54,12,54,12.5,54.5,13.5,54,14,54],[22.5,44,23,44,23.5,44,24,43.5,25.5,43.5,26,44,27,44,28,44,28.5,43.5,28,43.5,27.5,42.5,28,42,27,42,26,42,26,41.5,25,41,24.5,41.5,23.5,41.5,23,41.5,23,42,22.5,42.5,22.5,43,23,43,22.5,43.5,22.5,44],[26.5,35.5,26,35,24.5,35,23.5,35.5,24,35.5,25,35.5,26,35.5,25.5,35,26.5,35.5],[23,41.5,23.5,41.5,24.5,41.5,25,41,26,41.5,26,42,26.5,41.5,26.5,41,26,41,25.5,41,25,41,23.5,40.5,24.5,40,24,40,23.5,40,23,40.5,22.5,40.5,23,39.5,23.5,39,23,39,23.5,38.5,24,38,24,37.5,23,38,23.5,37.5,23,37.5,23,36.5,22.5,36.5,21.5,37,21.5,37.5,21,38.5,20.5,39,20,39.5,20.5,40,20.5,40.5,21,40.5,21,41,21.5,41,22,41,22.5,41,23,41.5],[45,37,44.5,37,44,37.5,43,37.5,42.5,37,41,37,40.5,37,39.5,36.5,38.5,36.5,38,37,37,36.5,36.5,37,36.5,36.5,36.5,36,36,36,36,36.5,35.5,36.5,34.5,37,34,36,32.5,36,31.5,36.5,30.5,36.5,29.5,36,28.5,36.5,27.5,36.5,27,37.5,26.5,38,27,39,26,39.5,27.5,40.5,29,40.5,29,41,31,41,32.5,41.5,33.5,42,35,42,37,41.5,38.5,41,39.5,41,40.5,41,41.5,41.5,42.5,41.5,43.5,41,44,40.5,43.5,40.5,44.5,40,45,39.5,44,39.5,44.5,38.5,44,38,45,37],[26,42,27,42,28,42,28,41.5,29,41.5,29,41,27.5,41,27,40.5,26.5,40,26,40.5,26,41,26.5,41,26.5,41.5,26,42],[21,41,21,40.5,20.5,40.5,20.5,40,20,39.5,20,40,19.5,40.5,19.5,41.5,19.5,42,19.5,42.5,20,42.5,20.5,42.5,20.5,42,20.5,41.5,20.5,41,21,41],[16.5,46.5,17,46.5,17.5,46,18.5,46,19,46,19,45.5,19.5,45,19,45,18.5,45,18,45,17,45,16.5,45,16,45,16,44.5,16.5,44,17,43.5,17.5,43.5,17.5,43,18.5,42.5,17.5,43,17,43,16,43.5,15,44,15.5,44.5,15,44.5,15,45,14.5,45,14,45,13.5,45,13.5,45.5,14.5,45.5,15,45.5,15.5,45.5,15.5,46,16,46,16.5,46.5],[9.5,47.5,9.5,47,10,47,10.5,47,10.5,46.5,10,46.5,9,46.5,9,46,8.5,46,8,46,7.5,46,7,46,6.5,46.5,6,46.5,7,47.5,6.5,47.5,7,47.5,7.5,47.5,8.5,47.5,8.5,48,9.5,47.5],[6,51,6,50,5.5,49.5,5,50,4.5,50,3.5,50.5,3,51,2.5,51,3.5,51.5,4,51.5,5,51.5,5.5,51,6,51],[7,53.5,7,53,7,52,6.5,52,6,52,6,51,5.5,51,5,51.5,4,51.5,3.5,51.5,4,51.5,4.5,53,6,53.5,7,53.5],[-9,42,-8.5,42,-8.5,42.5,-8,42,-7.5,42,-6.5,42,-6.5,41.5,-7,41,-7,40.5,-7,40,-7,39.5,-7.5,39.5,-7,39,-7.5,38.5,-7,38,-7.5,37.5,-7.5,37,-8,37,-8.5,37,-9,37,-8.5,37.5,-9,38.5,-9.5,38.5,-9.5,39.5,-9,40,-9,41,-9,41.5,-9,42],[-7.5,37,-7.5,37.5,-7,38,-7.5,38.5,-7,39,-7.5,39.5,-7,39.5,-7,40,-7,40.5,-7,41,-6.5,41.5,-6.5,42,-7.5,42,-8,42,-8.5,42.5,-8.5,42,-9,42,-9,42.5,-9.5,43,-8,43.5,-7,43.5,-5.5,43.5,-4.5,43.5,-3.5,43.5,-2,43.5,-1.5,43,0.5,42.5,0.5,43,2,42.5,3,42.5,3,42,2,41,1,41,0.5,40.5,0,40,-0.5,39.5,0,38.5,-0.5,38.5,-0.5,37.5,-1.5,37.5,-2,36.5,-3.5,36.5,-4.5,36.5,-5,36.5,-5.5,36,-6,36,-6,36.5,-6.5,37,-7.5,37],[-6,54,-6,53,-7,52.5,-8.5,51.5,-10,52,-9,53,-9.5,54,-8.5,54.5,-7.5,55,-7.5,54.5,-7.5,54,-7,54,-6,54],[166,-21,166.5,-21.5,167,-22,166.5,-22.5,166,-22,165.5,-21.5,165,-21,164,-20.5,164,-20,164.5,-20,165,-20.5,165.5,-21,166,-21],[159.5,-8,160,-8.5,159,-8,158.5,-8,158,-7.5,158.5,-7.5,159,-7.5,159.5,-8],[177,-40,176.5,-40.5,176,-41.5,175,-41.5,174.5,-41.5,175,-40.5,175,-40,174,-39.5,174,-39,174.5,-39,174.5,-38,174.5,-37.5,174.5,-36.5,174,-36,173,-35,172.5,-34.5,173,-34.5,173.5,-35,174.5,-35.5,174.5,-36,175.5,-37,175.5,-36.5,176,-37,176,-37.5,177,-38,177.5,-38,178,-37.5,178.5,-37.5,178.5,-38.5,178,-39,177,-39,177,-39.5,177,-40],[169.5,-43.5,170.5,-43,171,-42.5,171.5,-42,172,-41.5,172,-41,173,-40.5,173,-41,173,-41.5,174,-41,174,-41.5,174,-42,173,-43,172.5,-43.5,173,-44,172.5,-44,171.5,-44,171,-45,170.5,-46,170,-46.5,169.5,-46.5,168.5,-46.5,168,-46.5,166.5,-46,167,-45,168.5,-44,169,-44,169.5,-43.5],[147.5,-41,148.5,-41,148.5,-42,148,-42.5,148,-43,147.5,-43,147,-43.5,146.5,-43.5,146,-43.5,145.5,-42.5,145.5,-42,144.5,-41,144.5,-40.5,145.5,-41,146.5,-41,147,-41,147.5,-41],[126,-32,125,-32.5,124,-33,124,-33.5,123.5,-34,123,-34,122,-34,121.5,-34,120.5,-34,120,-34,119.5,-34.5,119,-34.5,118.5,-34.5,118,-35,117.5,-35,116.5,-35,115.5,-34.5,115,-34,115,-33.5,115.5,-33.5,115.5,-33,116,-32,115.5,-31.5,115,-30.5,115,-30,115,-29.5,114.5,-29,114.5,-28.5,114,-28,114,-27.5,113.5,-26.5,113.5,-26,114,-26.5,113.5,-25.5,114,-26,114,-26.5,114,-26,113.5,-25,113.5,-24.5,113.5,-24,113.5,-23.5,114,-23,113.5,-22.5,114,-22,114,-22.5,114.5,-22,115.5,-21.5,116,-21,116.5,-20.5,117,-20.5,117.5,-20.5,118,-20.5,119,-20.5,119,-20,119.5,-20,120,-20,121,-19.5,121.5,-19,121.5,-18.5,122,-18,122.5,-18,122.5,-17.5,123,-16.5,123.5,-17.5,124,-17,123.5,-16.5,124,-16,124.5,-16.5,124.5,-15.5,125,-15,125,-14.5,125.5,-14.5,125.5,-14,126,-14.5,126,-14,126.5,-14,127,-14,128,-14.5,128.5,-15,129,-15,129.5,-15,129.5,-14.5,130,-13.5,130.5,-13.5,130,-13,130.5,-12.5,131,-12,131.5,-12.5,132.5,-12,132.5,-11.5,132,-11.5,132.5,-11,133,-11.5,133.5,-12,134.5,-12,135.5,-12,136,-12,136.5,-12,137,-12.5,136.5,-13,136.5,-13.5,136,-13.5,136,-14,135.5,-14.5,135.5,-15,136.5,-15.5,137,-16,137.5,-16,138.5,-17,139,-17,139.5,-17.5,140,-17.5,141,-17.5,141,-17,141.5,-16.5,141.5,-16,141.5,-15,141.5,-14.5,141.5,-13.5,141.5,-13,142,-12.5,141.5,-12.5,142,-12,142,-11.5,142,-11,142.5,-10.5,143,-11,143,-12,143,-12.5,143.5,-13,143.5,-13.5,143.5,-14,144,-14.5,144.5,-14,145,-14.5,145.5,-15,145.5,-15.5,145.5,-16.5,145.5,-17,146,-17,146,-18,146,-18.5,146.5,-19,147.5,-19.5,148,-20,149,-20.5,148.5,-20.5,149.5,-21.5,149.5,-22.5,150,-22,150.5,-22.5,151,-23.5,151.5,-24,152,-24.5,153,-25.5,153,-26,153,-26.5,153,-27.5,153.5,-28,153.5,-29,153.5,-29.5,153,-30.5,153,-31,153,-31.5,152.5,-32.5,151.5,-33,151.5,-34,151,-34.5,150.5,-35,150.5,-35.5,150,-36.5,150,-37,150,-37.5,149.5,-38,148.5,-38,147.5,-38,147,-38.5,146.5,-39,145.5,-38.5,145,-38.5,145,-38,144.5,-38,143.5,-39,142.5,-38.5,142,-38.5,141.5,-38.5,140.5,-38,140,-37.5,140,-36.5,139.5,-36,139,-35.5,138,-35.5,138.5,-35,138,-34.5,137.5,-35,137,-35.5,137.5,-34.5,137.5,-34,138,-33.5,138,-33,137,-34,136.5,-34,136,-35,135,-34.5,135,-34,134.5,-33,134,-33,134.5,-32.5,133,-32,132.5,-32,131.5,-31.5,129.5,-31.5,128,-32,127,-32.5,126,-32],[82,7.5,81.5,6.5,81,6,80.5,6,80,7,79.5,8,80,10,81,9.5,81.5,8.5,82,7.5],[109.5,18,108.5,18.5,108.5,19.5,109,20,110,20,111,20,111,19.5,110.5,19.5,110.5,18.5,109.5,18],[80.5,42.5,80,43,81,43,80,45,82,45.5,82.5,45.5,83,47.5,85,47,85.5,47.5,86,48.5,86.5,48.5,87.5,49,88,49.5,88,48.5,89,48,90.5,47.5,91,47,90.5,45.5,91,45.5,92,45,93.5,45,94.5,44.5,95.5,44,96,43.5,96.5,42.5,97.5,42.5,99.5,42.5,101,42.5,102,42.5,103.5,42,104.5,42,105,41.5,106,42,107.5,42.5,109,42.5,110.5,43,111,43.5,112,43.5,111.5,44,111.5,44.5,112,45,112.5,45,113.5,45,114.5,45.5,116,45.5,116.5,46.5,117.5,46.5,119,47,119.5,46.5,120,47,119,47.5,118,48,117.5,47.5,116.5,48,115.5,47.5,115.5,48,116,49,116.5,50,118,49.5,119.5,50,119.5,50.5,120,51.5,120.5,52,120.5,52.5,120,53,121,53.5,122,53.5,123.5,53.5,125,53,126,53,126.5,52,127,51.5,127.5,50.5,127.5,50,129.5,49.5,130.5,48.5,131,48,132.5,48,133.5,48,135,48.5,134.5,47.5,134,47,134,46,133,45,132,45.5,131,45,131.5,44,131,43,130.5,43,130.5,42.5,130,43,129.5,42.5,128,42,128,41.5,127.5,41.5,127,42,126,41,125,40.5,124.5,40,123,39.5,122,39,121,39,121.5,39.5,121.5,40,122,40.5,121.5,41,121,40.5,119.5,40,119,39.5,118,39,117.5,38.5,118,38,119,38,119,37.5,119.5,37,121,38,121.5,37.5,122.5,37.5,122.5,37,121,36.5,120.5,36,119.5,35.5,119,35,120,34.5,120.5,33.5,121,32.5,122,31.5,122,31,121.5,30.5,121.5,30,122,30,122,29,121.5,28,121,28,120.5,27,119.5,25.5,118.5,24.5,117.5,23.5,116,23,115,22.5,114,22,114,22.5,113,22,112,21.5,111,21.5,110.5,20.5,110,20.5,109.5,21,110,21.5,108.5,21.5,108,21.5,107,22,106.5,22,106.5,23,106,23,105.5,23.5,104.5,23,103.5,22.5,102.5,22.5,102,22.5,101.5,22.5,102,21,101.5,21,101,21.5,101,22,100.5,21.5,100,21.5,99,22,99.5,23,99,23,98.5,24,97.5,24,97.5,25,98.5,26,98.5,26.5,98.5,27.5,98,27.5,98,28.5,97.5,28.5,96,28.5,96.5,29,96,29.5,95.5,29,94.5,29.5,93.5,28.5,92.5,28,91.5,28,90.5,28,90,28.5,89.5,28,89,27.5,88.5,28,88,28,87,28,86,28,85,28.5,84,29,84,29.5,83.5,29.5,82.5,30,81.5,30.5,81,30,79.5,31,78.5,31.5,78.5,32.5,79,32.5,79,33,79,33.5,79,34.5,78,35.5,76,36,76,36.5,75,37,75,37.5,75,38,75,38.5,74.5,38.5,74,38.5,73.5,39.5,74,39.5,74,40,75,40.5,75.5,40.5,76.5,40.5,77,41,78,41,78.5,41.5,80,42,80.5,42.5],[122,24.5,121,23,120.5,22,120,23,120,23.5,120.5,24.5,121.5,25.5,122,25,122,24.5],[10.5,47,11,47,12,47,12.5,47,14,46.5,13.5,46,14,45.5,13,45.5,12.5,45.5,12.5,45,12.5,44.5,12.5,44,13.5,43.5,14,43,15,42,16,42,16,41.5,17,41,17.5,41,18.5,40.5,18.5,40,17.5,40.5,17,40.5,16.5,40,17,39.5,17,39,16.5,39,16,38,15.5,38,16,39,15.5,39.5,15.5,40,15,40,14.5,40.5,14,41,13.5,41,13,41.5,12,41.5,11,42.5,10.5,43,10,44,9.5,44,9,44.5,8.5,44,8,44,7.5,43.5,7.5,44,7,44.5,6.5,45,7,45.5,7,46,7.5,46,8,46,8.5,46,9,46,9,46.5,10,46.5,10.5,46.5,10.5,47],[15,38,15.5,38,15,37.5,15.5,37,15,36.5,14.5,37,14,37,12.5,37.5,12.5,38,13.5,38,15,38],[8.5,41,9,41,10,40.5,9.5,39,9,39,8.5,39,8.5,40.5,8,41,8.5,41],[10,55,9.5,55,8.5,55,8,55.5,8,56.5,8.5,57,9.5,57,10,57.5,10.5,57.5,10.5,57,10.5,56.5,11,56.5,10.5,56,9.5,55.5,10,55],[-6,54,-7,54,-7.5,54,-7.5,54.5,-7.5,55,-6.5,55,-5.5,54.5,-6,54],[-3,53.5,-3,54,-3.5,54.5,-5,55,-4.5,55.5,-5,56,-5.5,55.5,-5.5,56.5,-6,57,-6,58,-5,58.5,-4,58.5,-3,58.5,-4,57.5,-3,57.5,-2,57.5,-2,57,-3,56,-2,56,-1,54.5,-0.5,54.5,0,53.5,0.5,53,1.5,52.5,1.5,52,1,52,1.5,51.5,0.5,51,-1,51,-2.5,50.5,-3,50.5,-3.5,50,-4.5,50.5,-5,50,-6,50,-4.5,51,-3.5,51.5,-5,51.5,-5.5,52,-4,52.5,-5,53,-4.5,53.5,-3,53.5],[-14.5,66.5,-14.5,66,-13.5,65,-15,64.5,-18,63.5,-18.5,63.5,-20,63.5,-23,64,-22,64.5,-24,65,-22,65,-22,65.5,-24.5,65.5,-23.5,66.5,-22,66.5,-20.5,65.5,-19,66.5,-18,66,-16,66.5,-14.5,66.5],[46.5,42,47.5,41,48,41,48,41.5,48.5,42,49,41.5,49.5,40.5,50,40.5,50.5,40.5,49.5,40,49.5,39.5,49,39,49,38.5,48.5,38.5,48,39,48.5,39.5,48,39.5,47.5,39.5,46.5,39,46.5,39.5,46,39.5,45.5,40,46,40,45.5,40.5,45.5,41,45,41,45,41.5,46,41,46.5,41,46,41.5,46.5,42],[40,43.5,41,43.5,42.5,43,44,42.5,44.5,42.5,45.5,42.5,46,42,46.5,42,46,41.5,46.5,41,46,41,45,41.5,45,41,43.5,41,42.5,41.5,41.5,41.5,41.5,42,41.5,42.5,41,43,40.5,43,40,43.5],[122.5,10,123,10.5,123,11,123.5,11,123.5,10.5,124,11,124,10.5,123.5,10,123.5,9.5,123,9,122.5,9.5,122.5,10],[126.5,8.5,126.5,8,126.5,7,126,6.5,126,7.5,125.5,7,125.5,6,125.5,5.5,124,6,124,7,124,7.5,123.5,8,123.5,7.5,123,7.5,122,7,122.5,8,123,8.5,123.5,8.5,124,8,124.5,8.5,125,9,125.5,9,125.5,10,126,9.5,126.5,9,126.5,8.5],[118.5,9.5,117,8.5,117.5,9,118.5,9.5,119,10.5,119.5,11.5,119.5,10.5,119,10,118.5,9.5],[122.5,18,122,18,122.5,17,122.5,16.5,121.5,16,121.5,15,121.5,14.5,122.5,14,122.5,14.5,124,14,124,13,124,12.5,123.5,13,123,13.5,122.5,13,122,14,121,13.5,120.5,14,120.5,14.5,121,14.5,120.5,15,120.5,14.5,120,15,120,15.5,120,16.5,120.5,16,120.5,17.5,120.5,18.5,121.5,18.5,122,18,122,18.5,122.5,18],[125.5,12,126,11,125,11.5,125,11,125.5,10.5,125,10,125,11,124.5,11,124.5,11.5,125,11.5,125,12,124.5,12.5,125,12.5,125.5,12],[100,6.5,100.5,6.5,101,6,101,5.5,102,6,102.5,6,103,5.5,103.5,5,103.5,4,103.5,3.5,103.5,3,104,2.5,104,1.5,103.5,1,102.5,2,101.5,3,101.5,3.5,100.5,4,100.5,5,100,5.5,100.5,6,100,6.5],[118,4,117,4.5,116,4.5,115.5,3,115,3,114.5,1.5,114,1,113,1.5,112.5,1.5,112,1,111,1,110.5,1,110,1.5,109.5,2,110.5,1.5,111,2,111.5,2.5,112,3,113,3,113.5,4,114,4.5,114.5,4,115,4.5,115.5,4.5,115.5,5,115.5,5.5,116,6,116.5,7,117,7,117.5,6.5,117.5,6,118.5,5.5,119,5.5,119,5,118.5,5,118.5,4.5,118,4],[14,46.5,14.5,46.5,15,46.5,16,46.5,16,47,16.5,47,16.5,46.5,16,46,15.5,46,15.5,45.5,15,45.5,14.5,45.5,13.5,45.5,14,45.5,13.5,46,14,46.5],[28.5,69,28.5,68.5,30,67.5,29,67,30,66,29.5,65,30.5,64,30,63.5,31.5,63,31,62.5,30,62,28,60.5,26.5,60.5,24.5,60,23,60,22.5,60.5,21.5,60.5,21.5,61.5,21,62.5,21.5,63,22.5,64,24.5,65,25.5,65,25.5,65.5,24,66,23.5,66.5,23.5,68,22,68.5,20.5,69,21,69.5,22.5,69,23.5,69,24.5,68.5,25.5,69,26,70,27.5,70,29,70,28.5,69],[22.5,49,22,48.5,21,48.5,20.5,48.5,20,48.5,20,48,19.5,48.5,19,48,18.5,48,18,48,17.5,48,17,48,17,48.5,17,49,17.5,49,18,49,18,49.5,18.5,49.5,19,49.5,19.5,49.5,20,49,20.5,49.5,21,49.5,21.5,49.5,22.5,49],[15,51,15.5,51,16,50.5,16.5,50,17,50.5,17.5,50.5,17.5,50,18.5,50,19,49.5,18.5,49.5,18,49.5,18,49,17.5,49,17,49,17,48.5,16.5,49,16,48.5,15.5,49,15,49,14.5,48.5,13.5,49,13,49.5,12.5,49.5,12.5,50,12,50.5,13,50.5,13.5,50.5,14,51,14.5,51,15,51],[36.5,14.5,36.5,15,37,16.5,37,17,37,17.5,38,17.5,38.5,18,39,17,39.5,16,40,15.5,41,14.5,41.5,14,42.5,13.5,42.5,13,43,12.5,42.5,12.5,42,13,41.5,13.5,41,14,40,14.5,39.5,14.5,39,14.5,38.5,14.5,38,15,37.5,14,36.5,14.5],[142,39,141,38,141,37,140.5,36.5,141,36,140.5,35,139,34.5,137,34.5,136,33.5,135,34,135,34.5,133.5,34.5,132,34,131,34,132,33,131.5,31.5,130.5,31,130,31.5,130.5,32.5,130,32.5,129.5,33.5,130.5,33.5,131,34,132,34.5,132.5,35.5,134.5,35.5,135.5,35.5,136.5,37.5,137.5,37,139,38,139.5,38,140,39.5,140,40.5,140.5,41,141.5,41.5,142,40,142,39],[144.5,44,145.5,44.5,145.5,43.5,144,43,143,42,141.5,42.5,141,41.5,140,41.5,140,42.5,140.5,43.5,141.5,43.5,141.5,45,142,45.5,143,44.5,144,44,144.5,44],[132.5,33.5,133,34,133.5,34,134,34.5,134.5,34,135,34,134,33,134,33.5,133.5,33.5,133,32.5,132.5,33,132.5,33.5],[-58,-20,-58,-20.5,-58,-22,-57,-22.5,-56.5,-22,-56,-22.5,-55.5,-22.5,-55.5,-23.5,-55.5,-24,-55,-24,-54.5,-24,-54.5,-24.5,-54.5,-25,-54.5,-25.5,-55,-26.5,-55.5,-27.5,-56.5,-27.5,-57.5,-27.5,-58.5,-27,-57.5,-25.5,-58,-25,-59,-25,-60,-24,-61,-24,-62.5,-22,-62.5,-21,-62.5,-20.5,-62,-19.5,-60,-19.5,-59,-19.5,-58,-20],[52,19,53,17.5,53,16.5,52.5,16.5,52,16,52,15.5,51,15,49.5,14.5,48.5,14,48,14,47.5,13.5,46.5,13.5,46,13.5,45.5,13.5,45.5,13,45,13,45,12.5,44.5,12.5,44,12.5,43.5,12.5,43,13,43.5,14,43,14,43,15,42.5,15,43,15.5,42.5,15.5,43,16,43,16.5,43,17,43.5,17.5,44,17.5,45,17.5,45.5,17.5,46.5,17,46.5,17.5,47,17,47.5,17,48,18,49,18.5,52,19],[35,29.5,36,29,36.5,29.5,36.5,30,37.5,30,37.5,30.5,38,30.5,37,31.5,39,32,40.5,32,42,31,44.5,29,46.5,29,47.5,29,47.5,28.5,48.5,28.5,49,27.5,49.5,27.5,49.5,27,50,26.5,50,26,50,25.5,50.5,25.5,50.5,25,51,25,51,24.5,51.5,24.5,51.5,24,52,23,55,22.5,55.5,22,55,20,52,19,49,18.5,48,18,47.5,17,47,17,46.5,17.5,46.5,17,45.5,17.5,45,17.5,44,17.5,43.5,17.5,43,17,43,16.5,42.5,17,42.5,17.5,42,18,41,18.5,41,19.5,40,20,40,20.5,39,21.5,39,22,39,22.5,38.5,23.5,38,24,37.5,24.5,37,25,37,25.5,36.5,26,36,26.5,35.5,27.5,35,28,34.5,28,35,28.5,35,29,35,29.5],[-48.5,-78,-48,-78,-46.5,-78,-45,-78,-44,-78.5,-43.5,-79,-43.5,-79.5,-43.5,-80,-45,-80.5,-46.5,-80.5,-48.5,-81,-50.5,-81,-53,-81,-54,-80.5,-54,-80,-52,-80,-51,-79.5,-50.5,-79,-50,-79,-49.5,-78.5,-48.5,-78],[-66.5,-80.5,-64,-80.5,-62,-80.5,-61,-80,-60.5,-79.5,-59.5,-80,-60,-80.5,-60,-81,-62.5,-81,-64.5,-81,-65.5,-80.5,-66.5,-80.5],[-74,-71.5,-73,-71,-72,-71,-72,-70.5,-71.5,-70.5,-71.5,-69.5,-71,-69,-70.5,-69,-69.5,-69.5,-69,-70,-68.5,-70.5,-68.5,-71,-68.5,-71.5,-68.5,-72,-69,-72,-70,-72.5,-71,-72.5,-72.5,-72.5,-72,-72,-73,-72,-74,-72.5,-75,-72,-75,-71.5,-74,-71.5],[-102.5,-72,-101.5,-71.5,-100.5,-72,-99,-72,-98,-72,-97,-72,-96,-72.5,-97,-72.5,-98,-72.5,-99.5,-72.5,-101,-72.5,-102,-72.5,-102.5,-72],[-122.5,-73.5,-121,-73.5,-120,-73.5,-118.5,-73.5,-119.5,-74,-120,-74,-121.5,-74,-122.5,-73.5],[-127.5,-73.5,-126.5,-73,-125.5,-73.5,-124,-74,-124.5,-74,-126,-73.5,-127.5,-73.5],[-163.5,-78.5,-163,-78,-161,-78.5,-160,-78.5,-159.5,-79,-159,-79.5,-161,-79.5,-162.5,-79.5,-163,-79,-163.5,-78.5],[180,-84.5,180,-90,-180,-90,-180,-84.5,-179,-84,-177.5,-84.5,-177,-84.5,-176,-84,-174.5,-84.5,-173,-84,-170,-84,-169,-84,-168.5,-84,-167,-84.5,-164,-85,-162,-85,-158,-85.5,-155,-85,-151,-85.5,-148.5,-85.5,-146,-85.5,-143,-85,-143,-84.5,-147,-84.5,-150,-84.5,-151,-84,-153.5,-83.5,-153.5,-83,-153,-83,-152.5,-82.5,-153,-82,-154.5,-82,-155.5,-81.5,-157,-81,-154.5,-81,-152,-81,-150.5,-81.5,-149,-81,-147,-80.5,-146.5,-80.5,-147,-80,-148,-79.5,-149.5,-79.5,-151.5,-79.5,-153.5,-79,-155.5,-79,-156,-78.5,-157.5,-78.5,-158,-78,-158.5,-77,-158,-77,-157,-77.5,-155.5,-77,-153.5,-77,-153,-77.5,-151.5,-77.5,-150,-77,-148.5,-77,-147.5,-76.5,-146,-76.5,-146,-76,-146.5,-75.5,-146,-75.5,-145,-75,-144.5,-75.5,-143,-75.5,-141.5,-75,-140,-75,-139,-75,-137.5,-74.5,-136.5,-74.5,-135,-74.5,-134.5,-74.5,-133.5,-74.5,-132.5,-74.5,-131,-74.5,-129.5,-74.5,-128,-74.5,-127,-74.5,-125.5,-74.5,-124,-74.5,-122.5,-74.5,-121,-74.5,-119.5,-74.5,-118.5,-74,-117.5,-74,-116,-74,-115,-74,-114,-73.5,-113.5,-74,-113,-74.5,-112.5,-74.5,-111.5,-74.5,-110,-75,-108.5,-75,-107.5,-75,-106,-75,-105,-75,-103.5,-75,-102,-75,-100.5,-75.5,-100,-75,-101,-74.5,-101.5,-74,-102.5,-74,-103,-73.5,-103.5,-73.5,-103.5,-72.5,-103,-73,-101.5,-73,-100.5,-73,-99,-73,-98,-73,-97.5,-73.5,-96.5,-73.5,-95,-73.5,-93.5,-73.5,-92.5,-73,-91.5,-73.5,-90,-73.5,-89,-72.5,-88.5,-73,-87.5,-73,-86,-73,-85,-73.5,-84,-73.5,-82.5,-73.5,-81.5,-74,-80.5,-73.5,-80.5,-73,-79.5,-73.5,-78,-73.5,-77,-73.5,-76,-74,-75,-74,-74,-73.5,-73,-73.5,-71.5,-73.5,-70,-73,-69,-73,-68,-73,-67.5,-72.5,-67,-72,-67.5,-71.5,-67.5,-71,-68,-71,-68,-70.5,-68.5,-70,-68.5,-69.5,-68,-69,-67.5,-68.5,-67.5,-68,-67.5,-67.5,-67.5,-67,-66.5,-66.5,-66,-66,-65.5,-66,-64.5,-65.5,-64,-65,-63.5,-65,-63,-64.5,-62,-64.5,-61.5,-64.5,-60.5,-64,-60,-64,-59,-63.5,-58.5,-63.5,-58,-63.5,-57,-63.5,-57.5,-64,-58.5,-64,-59,-64.5,-60,-64,-60.5,-64.5,-61.5,-64.5,-62,-65,-62.5,-65,-62.5,-65.5,-62.5,-66,-62,-66,-63,-66.5,-63.5,-66.5,-64.5,-67,-65,-67,-65.5,-67.5,-65.5,-68,-65.5,-68.5,-65,-68.5,-64,-69,-63,-69,-63,-69.5,-62.5,-70,-62.5,-70.5,-62,-70.5,-61.5,-71,-61.5,-72,-61,-72.5,-61,-73,-60.5,-73,-61,-73.5,-61.5,-74,-62,-74.5,-63.5,-74.5,-63.5,-75,-64.5,-75.5,-66,-75.5,-67,-76,-68.5,-76,-70,-76,-70.5,-76.5,-72,-76.5,-74,-76.5,-75.5,-76.5,-77,-76.5,-77,-77,-75.5,-77.5,-74.5,-77.5,-73.5,-78,-75,-78,-76.5,-78,-78,-78.5,-78,-79,-77,-79.5,-76.5,-80,-75.5,-80.5,-73,-80.5,-71.5,-80.5,-70,-81,-68,-81.5,-65.5,-81.5,-63.5,-81.5,-61.5,-82,-59.5,-82.5,-58.5,-83,-58,-83,-57,-83,-55.5,-82.5,-53.5,-82.5,-51.5,-82,-50,-81.5,-47.5,-81.5,-45,-82,-43,-82,-42,-81.5,-41,-81.5,-38,-81.5,-36.5,-81,-34.5,-81,-32.5,-81,-30,-80.5,-28.5,-80.5,-29.5,-80,-29.5,-79.5,-31.5,-79.5,-33.5,-79.5,-35.5,-79.5,-36,-79,-36,-78.5,-35.5,-78,-34,-78,-32,-77.5,-31,-77.5,-30,-77,-29,-76.5,-27.5,-76.5,-26,-76.5,-25.5,-76.5,-24,-76,-22.5,-76,-21,-76,-20,-75.5,-19,-75.5,-17.5,-75,-16.5,-75,-15.5,-74.5,-15.5,-74,-16.5,-74,-16,-73.5,-15.5,-73,-14.5,-73,-13.5,-72.5,-12.5,-72.5,-11.5,-72,-11,-71.5,-10.5,-71.5,-9,-71.5,-8.5,-71.5,-7.5,-71.5,-7,-71,-6,-71,-5.5,-71.5,-4.5,-71.5,-3,-71.5,-2,-71,-0.5,-71,0,-71.5,1,-71.5,2,-71,3,-71,4,-71,5,-70.5,6.5,-70.5,7,-70,7.5,-70,8.5,-70,9.5,-70,10,-70.5,11,-71,12,-70.5,12.5,-70,13.5,-70,14.5,-70,15,-70.5,16,-70,17,-70,18,-70,19.5,-70,20.5,-70,21.5,-70,22,-70.5,22.5,-70.5,23.5,-70.5,25,-70.5,26,-70.5,27,-70.5,28,-70.5,29,-70,30,-70,31,-70,32,-69.5,33,-69.5,33.5,-69,34,-68.5,35,-68.5,35.5,-69,36,-69,37,-69,38,-69.5,38.5,-70,39.5,-69.5,40,-69,41,-69,42,-68.5,43,-68.5,44,-68.5,45,-68,45.5,-68,46.5,-67.5,47.5,-67.5,48.5,-67.5,49,-67,50,-67,51,-67,51,-66.5,52,-66,52.5,-66,53.5,-66,54.5,-66,55.5,-66,56.5,-66,57,-66,57.5,-66.5,58,-67,58.5,-67.5,60,-67.5,60.5,-67.5,61.5,-68,62.5,-68,63,-68,64,-67.5,65,-67.5,66,-67.5,67,-68,68,-68,69,-68,69.5,-69,69.5,-69.5,68.5,-70,68,-70.5,69,-70.5,69,-71,68.5,-71.5,68,-72,68.5,-72,70,-72.5,71,-72,71.5,-71.5,72,-71.5,72.5,-71,73,-70.5,73.5,-70.5,74,-70,74.5,-70,75.5,-69.5,76.5,-69.5,77.5,-69.5,78,-69,78.5,-68.5,79,-68.5,80,-68,81,-68,81.5,-67.5,82,-67.5,83,-67,84,-67.5,84.5,-67,85.5,-67,87,-67,87.5,-67,88,-66,88.5,-66.5,89,-67,89.5,-67,90.5,-67,91.5,-67,92.5,-67,93.5,-67,94,-67,95,-67,96,-67.5,96.5,-67,98,-67,98.5,-67,99.5,-67,100.5,-67,101,-66.5,101.5,-66.5,103,-65.5,103.5,-65.5,104,-66,105,-66.5,106,-67,107,-67,108,-67,109,-67,110,-66.5,111,-66.5,111.5,-66,113,-66,113.5,-66,114.5,-66,115,-66.5,115.5,-66.5,116.5,-66.5,117.5,-67,118.5,-67,120,-67.5,121,-67,121.5,-67,122.5,-66.5,123,-66.5,124,-66.5,125,-66.5,126,-66.5,127,-66.5,128,-66.5,129,-67,129.5,-66.5,131,-66.5,132,-66.5,133,-66.5,134,-66.5,135,-66,135,-65.5,135.5,-65.5,136,-66,136,-66.5,136.5,-67,137.5,-67,138.5,-67,140,-67,141,-67,142,-67,143,-67,144.5,-67,145.5,-67,146,-67,146,-67.5,146.5,-68,147.5,-68,149,-68.5,150,-68.5,151.5,-68.5,152.5,-69,153.5,-69,154.5,-68.5,155,-69,156,-69,157,-69.5,158,-69.5,159,-69.5,159.5,-70,161,-70,161.5,-70.5,162.5,-70.5,164,-70.5,165,-71,166,-71,167.5,-71,168.5,-71,169.5,-71,170.5,-71.5,171,-71.5,171,-72,170.5,-72.5,170,-73,169.5,-73.5,168,-74,167.5,-74,166,-74.5,165.5,-75,165,-75,164,-75.5,164,-76,163.5,-76,163.5,-76.5,163.5,-77,164,-77.5,164.5,-78,166.5,-78.5,167,-79,165,-79,163.5,-79,162,-79,161,-79.5,160.5,-80,160.5,-80.5,160,-81,161,-81.5,161.5,-81.5,162.5,-82,163.5,-82.5,165,-82.5,166.5,-83,169,-83.5,169.5,-84,172.5,-84,173,-84.5,176,-84,178.5,-84.5,180,-84.5],[32.5,35,33,35,33,35.5,33.5,35.5,34.5,35.5,34,35,33.5,35,33,35,32.5,35],[-2,35,-2,34.5,-1.5,34,-1.5,33,-1,32.5,-1.5,32.5,-2.5,32,-3,31.5,-3.5,31.5,-3.5,31,-5,30.5,-5,30,-6,29.5,-7,29.5,-8.5,29,-8.5,27.5,-9,27.5,-9,27,-9.5,27,-10,27,-10.5,27,-11.5,27,-11.5,26,-12,26,-12.5,25,-14,23.5,-14,22.5,-14.5,22,-15,21.5,-17,21.5,-17,22,-16.5,22,-16.5,22.5,-16.5,23,-16,23.5,-15.5,24.5,-15,24.5,-15,25,-15,25.5,-14.5,26.5,-14,26.5,-13,27.5,-12.5,28,-11.5,28,-11,29,-10.5,29,-9.5,30,-10,31,-9.5,32,-9.5,32.5,-8.5,33,-7.5,33.5,-7,34,-6,35,-6,36,-5,36,-4.5,35.5,-3.5,35.5,-2.5,35,-2,35],[37,22,33,22,29,22,25,22,25,25.5,25,29,24.5,30,25,30.5,25,31,25,31.5,26.5,31.5,27.5,31.5,28.5,31,29,31,29.5,31,30,31.5,31,31.5,31.5,31.5,32,31,32,31.5,33,31,34,31,34.5,31,35,30,35,29.5,34.5,29,34.5,28.5,34,28,34,27.5,33.5,28,33,28.5,32.5,30,32.5,28.5,33.5,27.5,34,26,34.5,25.5,35,25,35.5,24,35.5,23,36.5,22,37,22],[25,22,25,20,24,20,24,19.5,20,21.5,16,23.5,15,23,14,22.5,13.5,23,12,23.5,11.5,24,11,24.5,10.5,24.5,10,25,10,25.5,9.5,26,9.5,26.5,9.5,27,10,27.5,9.5,28,10,29,10,29.5,9.5,30.5,10,30.5,10,31,10,31.5,10.5,32,11,32,11.5,32.5,11.5,33,12.5,33,13,33,14,32.5,15,32.5,15.5,31.5,16.5,31,18,31,19,30.5,19.5,30.5,20,31,20,32,21,32.5,21.5,33,23,32.5,23,32,23.5,32,24,32,25,32,25,31.5,25,31,25,30.5,24.5,30,25,29,25,25.5,25,22],[48,8,45,5,43.5,5,43,4.5,42,4,41,4,41,4.5,40,4,39.5,3.5,39,3.5,38.5,3.5,38,3.5,37,4.5,36,4.5,36,5,36,5.5,35.5,5.5,34.5,6.5,34.5,7,34,7,33.5,7.5,33,8,33.5,8.5,34,8.5,34,9.5,34.5,10.5,34.5,11,35,11.5,35.5,12,36,12.5,36.5,13.5,36.5,14.5,37.5,14,38,15,38.5,14.5,39,14.5,39.5,14.5,40,14.5,41,14,41.5,13.5,42,13,42.5,12.5,42,12,41.5,11.5,42,11,42.5,11,43,11,42.5,10.5,43,10,43.5,9.5,43.5,9,47,8,48,8],[42.5,12.5,43,12.5,43.5,12.5,43.5,12,42.5,11.5,43,11.5,43,11,42.5,11,42,11,41.5,11.5,42,12,42.5,12.5],[49,11.5,49,11,49,10,49,9.5,48.5,9,48,8,47,8,43.5,9,43.5,9.5,43,10,42.5,10.5,43,11,43,11.5,43.5,11.5,43.5,11,44,10.5,44.5,10.5,45.5,10.5,46.5,11,47.5,11,48,11,48.5,11.5,49,11.5],[34,-1,32,-1,31,-1,30.5,-1,30,-1.5,29.5,-1.5,29.5,-0.5,30,0,30,0.5,30,1,30.5,1.5,31,2,31,2.5,31,3.5,31,4,32,3.5,32.5,4,33.5,4,34,4,34.5,3.5,34.5,3,35,2,34.5,1,34,0.5,34,0,34,-1],[30.5,-1,31,-1.5,31,-2.5,30.5,-2.5,30,-2.5,29.5,-3,29,-3,29,-2.5,29.5,-2,29.5,-1.5,30,-1.5,30.5,-1],[18.5,42.5,17.5,43,17.5,43.5,17,43.5,16.5,44,16,44.5,16,45,16.5,45,17,45,18,45,18.5,45,19,45,19.5,45,19,44.5,19.5,44,19.5,43.5,19,43.5,18.5,43,18.5,42.5],[22.5,42.5,23,42,23,41.5,22.5,41,22,41,21.5,41,21,41,20.5,41,20.5,41.5,20.5,42,21,42,21.5,42,22,42.5,22.5,42.5],[19,46,19.5,46,20,46,21,45.5,21.5,45,22,44.5,22.5,44.5,22.5,44,22.5,43.5,23,43,22.5,43,22.5,42.5,22,42.5,21.5,42,21.5,42.5,22,42.5,21.5,42.5,21.5,43,21,43,21,43.5,20.5,43,20,43,19.5,43,19.5,43.5,19,43.5,19.5,43.5,19.5,44,19,44.5,19.5,45,19,45,19.5,45,19,45.5,19,46],[20,42.5,19.5,42.5,19.5,42,19,42,19,42.5,18.5,42.5,18.5,43,19,43.5,19.5,43.5,19.5,43,20,43,20.5,43,20,42.5],[20.5,42,20.5,42.5,20,42.5,20.5,43,21,43.5,21,43,21.5,43,21.5,42.5,22,42.5,21.5,42.5,21.5,42,21,42,20.5,42],[31,3.5,30,4,29.5,4.5,29,4.5,28.5,4.5,28,4.5,27.5,5,27,5.5,26.5,6,26,6.5,26,7,25,7.5,25,8,24.5,8,24,8.5,24.5,9,25,10,25,10.5,26,10.5,26,10,26.5,9.5,27,9.5,28,9.5,29,9.5,29.5,10,30,10.5,31,9.5,31.5,10,32,10.5,32.5,11,32.5,11.5,32,12,32.5,12,33,12,33,11.5,33,10.5,33.5,10.5,34,10,34,9.5,34,8.5,33.5,8.5,33,8,33.5,7.5,34,7,34.5,7,34.5,6.5,35.5,5.5,34.5,5,34,4,33.5,4,32.5,4,32,3.5,31,4,31,3.5]],"j":[[141.9,39.2,141,38.2,141,37.1,140.6,36.3,140.8,35.8,140.3,35.1,139,34.7,137.2,34.6,135.8,33.5,135.1,33.8,135.1,34.6,133.3,34.4,132.2,33.9,131,33.9,132,33.1,131.3,31.5,130.7,31,130.2,31.4,130.4,32.3,129.8,32.6,129.4,33.3,130.4,33.6,130.9,34.2,131.9,34.7,132.6,35.4,134.6,35.7,135.7,35.5,136.7,37.3,137.4,36.8,138.9,37.8,139.4,38.2,140.1,39.4,139.9,40.6,140.3,41.2,141.4,41.4,141.9,40,141.9,39.2],[144.6,44,145.3,44.4,145.5,43.3,144.1,43,143.2,42,141.6,42.7,141.1,41.6,140,41.6,139.8,42.6,140.3,43.3,141.4,43.4,141.7,44.8,142,45.6,143.1,44.5,143.9,44.2,144.6,44],[132.4,33.5,132.9,34.1,133.5,33.9,133.9,34.4,134.6,34.1,134.8,33.8,134.2,33.2,133.8,33.5,133.3,33.3,133,32.7,132.4,33,132.4,33.5]]}/*GEO_END*/;
+
+/* =======================================================================
+   1. リージョン定義
+   ======================================================================= */
+const R = (label, country, lat, lon, jp) => ({label, country, lat, lon, jp: !!jp});
+const REGIONS = {
+  'ap-northeast-1': R('東京',           '日本',           35.68, 139.69, true),
+  'ap-northeast-3': R('大阪',           '日本',           34.69, 135.50, true),
+  'ap-northeast-2': R('ソウル',         '韓国',           37.57, 126.98),
+  'ap-east-1':      R('香港',           '中国（香港）',    22.32, 114.17),
+  'ap-southeast-1': R('シンガポール',   'シンガポール',     1.35, 103.82),
+  'ap-southeast-2': R('シドニー',       'オーストラリア', -33.87, 151.21),
+  'ap-southeast-3': R('ジャカルタ',     'インドネシア',    -6.21, 106.85),
+  'ap-southeast-4': R('メルボルン',     'オーストラリア', -37.81, 144.96),
+  'ap-south-1':     R('ムンバイ',       'インド',          19.08,  72.88),
+  'ap-south-2':     R('ハイデラバード', 'インド',          17.39,  78.49),
+  'us-east-1':      R('バージニア北部', '米国',            38.95, -77.45),
+  'us-east-2':      R('オハイオ',       '米国',            39.96, -83.00),
+  'us-west-1':      R('北カリフォルニア','米国',           37.35,-121.96),
+  'us-west-2':      R('オレゴン',       '米国',            45.84,-119.70),
+  'ca-central-1':   R('カナダ中部',     'カナダ',          45.50, -73.57),
+  'sa-east-1':      R('サンパウロ',     'ブラジル',       -23.55, -46.63),
+  'eu-west-1':      R('アイルランド',   'アイルランド',    53.35,  -6.26),
+  'eu-west-2':      R('ロンドン',       '英国',            51.51,  -0.13),
+  'eu-west-3':      R('パリ',           'フランス',        48.86,   2.35),
+  'eu-central-1':   R('フランクフルト', 'ドイツ',          50.11,   8.68),
+  'eu-north-1':     R('ストックホルム', 'スウェーデン',    59.33,  18.07),
+  'eu-south-1':     R('ミラノ',         'イタリア',        45.46,   9.19),
+  'me-central-1':   R('UAE',            'アラブ首長国連邦',24.47,  54.37),
+  'il-central-1':   R('テルアビブ',     'イスラエル',      32.08,  34.78),
+  'af-south-1':     R('ケープタウン',   '南アフリカ',     -33.92,  18.42)
+};
+const SRC = 'ap-northeast-1';
+
+/* グローバル CRIS の宛先＝サポートされる全商用リージョン。ここでは代表例を可視化 */
+const GLOBAL_DESTS = [
+  'ap-northeast-1','ap-northeast-2','ap-northeast-3','ap-southeast-1','ap-southeast-2','ap-south-1',
+  'us-east-1','us-east-2','us-west-1','us-west-2','ca-central-1','sa-east-1',
+  'eu-west-1','eu-west-2','eu-west-3','eu-central-1','eu-north-1','eu-south-1',
+  'me-central-1','il-central-1','af-south-1'
+];
+const APAC8 = ['ap-northeast-1','ap-northeast-2','ap-northeast-3','ap-south-1','ap-south-2','ap-southeast-1','ap-southeast-2','ap-southeast-4'];
+const APAC6 = ['ap-northeast-1','ap-northeast-2','ap-northeast-3','ap-south-1','ap-southeast-1','ap-southeast-2'];
+const APAC5 = ['ap-northeast-1','ap-northeast-2','ap-south-1','ap-southeast-1','ap-southeast-2'];
+const JP2 = ['ap-northeast-1','ap-northeast-3'];
+const TOKYO_ONLY = ['ap-northeast-1'];
+
+/* =======================================================================
+   2. 推論スコープ定義
+   ======================================================================= */
+const SCOPES = {
+  inRegion:{key:'inRegion', ico:'📍', label:'リージョン内推論',            sub:'（プレフィックスなし）', tone:'good', mark:'◎',
+            title:'東京リージョンだけで完結',  desc:'処理場所は ap-northeast-1 に固定。国境を越えません。'},
+  jp:      {key:'jp',       ico:'🛡', label:'日本国内クロスリージョン推論', sub:'jp.',                   tone:'good', mark:'◎',
+            title:'日本国内（東京・大阪）で完結', desc:'宛先は国内 2 リージョンのみ。データは国外に出ません。'},
+  apac:    {key:'apac',     ico:'🌏', label:'APAC 地理クロスリージョン推論', sub:'apac.',                tone:'bad',  mark:'✕',
+            title:'国外リージョンへ越境',      desc:'韓国・インド・シンガポール・オーストラリアでも推論され得ます。'},
+  global:  {key:'global',   ico:'🌐', label:'グローバル クロスリージョン推論', sub:'global.',             tone:'bad',  mark:'✕',
+            title:'世界中のリージョンへ分散',  desc:'サポートされる全商用リージョンが宛先。データレジデンシー要件は満たせません。'}
+};
+const SCOPE_ORDER = ['inRegion','jp','apac','global'];
+
+/* =======================================================================
+   3. モデルカタログ（東京リージョンでの実測値ベース）
+   ======================================================================= */
+const MODELS = [
+  {key:'sonnet46', name:'Claude Sonnet 4.6', vendor:'Anthropic', gennai:true,
+   v:{ jp:{id:'jp.anthropic.claude-sonnet-4-6', d:JP2},
+       global:{id:'global.anthropic.claude-sonnet-4-6', d:GLOBAL_DESTS} }},
+  {key:'sonnet45', name:'Claude Sonnet 4.5', vendor:'Anthropic', gennai:true,
+   v:{ jp:{id:'jp.anthropic.claude-sonnet-4-5-20250929-v1:0', d:JP2},
+       global:{id:'global.anthropic.claude-sonnet-4-5-20250929-v1:0', d:GLOBAL_DESTS} }},
+  {key:'haiku45', name:'Claude Haiku 4.5', vendor:'Anthropic', gennai:true,
+   v:{ jp:{id:'jp.anthropic.claude-haiku-4-5-20251001-v1:0', d:JP2},
+       global:{id:'global.anthropic.claude-haiku-4-5-20251001-v1:0', d:GLOBAL_DESTS} }},
+  {key:'opus48', name:'Claude Opus 4.8', vendor:'Anthropic',
+   v:{ jp:{id:'jp.anthropic.claude-opus-4-8', d:JP2},
+       global:{id:'global.anthropic.claude-opus-4-8', d:GLOBAL_DESTS} }},
+  {key:'opus47', name:'Claude Opus 4.7', vendor:'Anthropic',
+   v:{ jp:{id:'jp.anthropic.claude-opus-4-7', d:JP2},
+       global:{id:'global.anthropic.claude-opus-4-7', d:GLOBAL_DESTS} }},
+  {key:'nova2lite', name:'Amazon Nova 2 Lite', vendor:'Amazon',
+   v:{ jp:{id:'jp.amazon.nova-2-lite-v1:0', d:JP2},
+       global:{id:'global.amazon.nova-2-lite-v1:0', d:GLOBAL_DESTS} }},
+  {key:'novalite', name:'Amazon Nova Lite', vendor:'Amazon', gennai:true,
+   v:{ inRegion:{id:'amazon.nova-lite-v1:0', d:TOKYO_ONLY},
+       apac:{id:'apac.amazon.nova-lite-v1:0', d:APAC6} }},
+  {key:'novapro', name:'Amazon Nova Pro', vendor:'Amazon',
+   v:{ apac:{id:'apac.amazon.nova-pro-v1:0', d:APAC6} }},
+  {key:'sonnet4', name:'Claude Sonnet 4', vendor:'Anthropic',
+   v:{ apac:{id:'apac.anthropic.claude-sonnet-4-20250514-v1:0', d:APAC8},
+       global:{id:'global.anthropic.claude-sonnet-4-20250514-v1:0', d:GLOBAL_DESTS} }},
+  {key:'sonnet35', name:'Claude 3.5 Sonnet', vendor:'Anthropic',
+   v:{ inRegion:{id:'anthropic.claude-3-5-sonnet-20240620-v1:0', d:TOKYO_ONLY},
+       apac:{id:'apac.anthropic.claude-3-5-sonnet-20240620-v1:0', d:APAC5} }},
+  {key:'haiku3', name:'Claude 3 Haiku', vendor:'Anthropic',
+   v:{ inRegion:{id:'anthropic.claude-3-haiku-20240307-v1:0', d:TOKYO_ONLY},
+       apac:{id:'apac.anthropic.claude-3-haiku-20240307-v1:0', d:APAC5} }},
+  {key:'sonnet5', name:'Claude Sonnet 5', vendor:'Anthropic',
+   v:{ global:{id:'global.anthropic.claude-sonnet-5', d:GLOBAL_DESTS} }},
+  {key:'opus5', name:'Claude Opus 5', vendor:'Anthropic',
+   v:{ global:{id:'global.anthropic.claude-opus-5', d:GLOBAL_DESTS} }}
+];
+
+/* =======================================================================
+   4. タイムライン（フローのステップ定義）
+   ======================================================================= */
+const CYCLE = 10000; // 1 サイクル ms
+const PHASES = [
+  {t:[0,900],      t1:'職員が源内にプロンプトを送信',      t2:'庁内ネットワーク → ap-northeast-1'},
+  {t:[900,1500],   t1:'源内アプリが Bedrock を呼び出す',   t2:'Converse / InvokeModel（ソース: ap-northeast-1）'},
+  {t:[1500,2100],  t1:'modelId から推論プロファイルを解決',t2:'プレフィックス判定 → 宛先リージョン候補を決定'},
+  {t:[2100,4200],  t1:'宛先リージョンへルーティング',      t2:'AWS グローバルネットワーク（暗号化）'},
+  {t:[4200,5600],  t1:'選ばれたリージョンで推論を実行',    t2:'トークン生成（演算はここで起きる）'},
+  {t:[5600,7200],  t1:'レスポンスをソースリージョンへ返却',t2:'暗号化されたまま東京へ戻る'},
+  {t:[7200,8200],  t1:'CloudTrail に記録',                t2:'additionalEventData.inferenceRegion'},
+  {t:[8200,10000], t1:'デジタル主権の判定',                t2:'国境を越えたか／国内で完結したか'}
+];
+const EMIT_START = 2100, EMIT_GAP = 320, EMIT_N = 7;
+const OUT_MS = 1500, COMP_MS = 950, IN_MS = 1350;
+
+/* =======================================================================
+   5. 状態
+   ======================================================================= */
+const state = {
+  modelKey:'sonnet46',
+  scopeKey:'jp',
+  playing:true,
+  loop:true,
+  speed:1,
+  t:0,                 // サイクル内経過 ms
+  packets:[],
+  crossCount:0,
+  hits:{},             // リージョン別着地数
+  // カメラ
+  cam:{lon:139, lat:26, zoom:1.0},
+  camTarget:{lon:139, lat:26, zoom:1.0},
+  spin:true,
+  drag:null
+};
+const _mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+const reduceMotion = !!(_mq && _mq.matches);   // アニメーション低減設定を尊重する
+if (reduceMotion) state.spin = false;
+
+function model(){ return MODELS.find(m=>m.key===state.modelKey); }
+function variant(){ const m=model(); return m.v[state.scopeKey] || null; }
+function dests(){ const v=variant(); return v ? v.d : TOKYO_ONLY; }
+function isBad(){ return SCOPES[state.scopeKey].tone==='bad'; }
+
+/* =======================================================================
+   6. 球面数学
+   ======================================================================= */
+const D2R = Math.PI/180;
+function vec(lat, lon){
+  const p = lat*D2R, l = lon*D2R, c = Math.cos(p);
+  return {x: c*Math.sin(l), y: Math.sin(p), z: c*Math.cos(l)};
+}
+/** カメラ回転を適用（lon0/lat0 が画面中央） */
+function rot(v, lon0, lat0){
+  const cl = Math.cos(lon0*D2R), sl = Math.sin(lon0*D2R);
+  const x =  v.x*cl - v.z*sl;
+  const z =  v.x*sl + v.z*cl;
+  const cp = Math.cos(lat0*D2R), sp = Math.sin(lat0*D2R);
+  return {x:x, y: v.y*cp - z*sp, z: v.y*sp + z*cp};
+}
+function slerp(a,b,t){
+  let d = a.x*b.x + a.y*b.y + a.z*b.z;
+  d = Math.max(-1, Math.min(1, d));
+  const om = Math.acos(d);
+  if (om < 1e-6) return {x:a.x,y:a.y,z:a.z};
+  const s = Math.sin(om), w1 = Math.sin((1-t)*om)/s, w2 = Math.sin(t*om)/s;
+  return {x:a.x*w1+b.x*w2, y:a.y*w1+b.y*w2, z:a.z*w1+b.z*w2};
+}
+function angDist(a,b){
+  let d = a.x*b.x + a.y*b.y + a.z*b.z;
+  return Math.acos(Math.max(-1,Math.min(1,d)));
+}
+
+/* =======================================================================
+   7. 地球儀レンダラー
+   ======================================================================= */
+const cvs = document.getElementById('globe');
+const ctx = cvs.getContext('2d');
+let W=0, H=0, CX=0, CY=0, RAD=200, DPR=1;
+
+function resize(){
+  const st = document.getElementById('stage');
+  DPR = Math.min(2, window.devicePixelRatio||1);
+  W = st.clientWidth; H = st.clientHeight;
+  cvs.width = Math.round(W*DPR); cvs.height = Math.round(H*DPR);
+  cvs.style.width = W+'px'; cvs.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  CX = W/2; CY = H/2 + 6;
+  RAD = Math.min(W, H)*0.38;
+}
+window.addEventListener('resize', resize);
+
+/* --- カメラ行列は 1 フレーム 1 回だけ計算する --- */
+const CAM = {cl:1, sl:0, cp:1, sp:0, rr:200, altCap:0.34};
+function camUpdate(){
+  const c = state.cam;
+  CAM.cl = Math.cos(c.lon*D2R); CAM.sl = Math.sin(c.lon*D2R);
+  CAM.cp = Math.cos(c.lat*D2R); CAM.sp = Math.sin(c.lat*D2R);
+  CAM.rr = RAD * c.zoom;
+  // アークの最大高度：ズームしても画面外に飛び出さないよう動的に制限する
+  CAM.altCap = Math.max(0.06, Math.min(0.34, (0.96*Math.min(CX,CY))/CAM.rr - 1));
+}
+/* --- 高速投影：オブジェクトを作らずスクラッチ変数に書き出す（地形の内側ループ用） --- */
+let _px=0,_py=0,_pz=0;
+function pxyz(x,y,z,r){
+  const X = x*CAM.cl - z*CAM.sl;
+  const Z = x*CAM.sl + z*CAM.cl;
+  const Y = y*CAM.cp - Z*CAM.sp;
+  _pz = y*CAM.sp + Z*CAM.cp;
+  const rr = r*CAM.rr;
+  _px = CX + X*rr; _py = CY - Y*rr;
+}
+/** 緯度経度→画面座標。r は地表からの高さ倍率 */
+function proj(lat, lon, r){
+  return projV(vec(lat,lon), r);
+}
+function projV(v, r){
+  const rf = r||1;
+  const X = v.x*CAM.cl - v.z*CAM.sl;
+  const Z = v.x*CAM.sl + v.z*CAM.cl;
+  const Y = v.y*CAM.cp - Z*CAM.sp;
+  const Z2 = v.y*CAM.sp + Z*CAM.cp;
+  const rr = rf * CAM.rr;
+  return {x: CX + X*rr, y: CY - Y*rr, z: Z2, r:rf,
+          hidden: Z2 < 0 && Math.hypot(X,Y)*rf < 1};
+}
+
+/* --- 地形・経緯線を単位ベクトルへ前計算（毎フレームの三角関数を避ける） --- */
+let GEOV = null, GRAT = null;
+function flatToVecs(rings){
+  return (rings||[]).map(a=>{
+    const n = a.length/2, out = new Float32Array(n*3);
+    for (let i=0;i<n;i++){
+      const p = a[i*2+1]*D2R, l = a[i*2]*D2R, c = Math.cos(p);
+      out[i*3] = c*Math.sin(l); out[i*3+1] = Math.sin(p); out[i*3+2] = c*Math.cos(l);
+    }
+    return out;
+  });
+}
+function prepareGeo(){
+  GEOV = {w: flatToVecs(GEO && GEO.w), j: flatToVecs(GEO && GEO.j)};
+  const lines = [];
+  for (let lon=-180; lon<180; lon+=20){ const p=[]; for(let lat=-90;lat<=90;lat+=4) p.push([lat,lon]); lines.push(p); }
+  for (let lat=-80; lat<=80; lat+=20){ const p=[]; for(let lon=-180;lon<=180;lon+=4) p.push([lat,lon]); lines.push(p); }
+  GRAT = lines.map(pts=>{
+    const out = new Float32Array(pts.length*3);
+    pts.forEach((q,i)=>{ const v=vec(q[0],q[1]); out[i*3]=v.x; out[i*3+1]=v.y; out[i*3+2]=v.z; });
+    return out;
+  });
+}
+
+function drawSphere(){
+  const rr = RAD*state.cam.zoom;
+  // 外側グロー
+  const g0 = ctx.createRadialGradient(CX,CY,rr*0.92, CX,CY,rr*1.5);
+  g0.addColorStop(0,'rgba(120,110,255,.30)');
+  g0.addColorStop(1,'rgba(120,110,255,0)');
+  ctx.fillStyle=g0; ctx.beginPath(); ctx.arc(CX,CY,rr*1.5,0,6.2832); ctx.fill();
+  // 本体
+  const g = ctx.createRadialGradient(CX-rr*0.35, CY-rr*0.4, rr*0.1, CX, CY, rr);
+  g.addColorStop(0,'#6a5cd8');
+  g.addColorStop(.45,'#4a3fae');
+  g.addColorStop(.82,'#241f63');
+  g.addColorStop(1,'#100d33');
+  ctx.fillStyle=g; ctx.beginPath(); ctx.arc(CX,CY,rr,0,6.2832); ctx.fill();
+  // リム
+  ctx.strokeStyle='rgba(180,190,255,.45)'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(CX,CY,rr,0,6.2832); ctx.stroke();
+}
+
+function drawGraticule(front){
+  if (!GRAT) return;
+  ctx.lineWidth = 0.6;
+  ctx.strokeStyle = front ? 'rgba(200,210,255,.16)' : 'rgba(200,210,255,.06)';
+  for (let i=0;i<GRAT.length;i++){
+    const a = GRAT[i];
+    ctx.beginPath(); let started=false;
+    for (let k=0;k<a.length;k+=3){
+      pxyz(a[k],a[k+1],a[k+2],1.001);
+      if ((_pz>=0)!==front){ started=false; continue; }
+      if(!started){ ctx.moveTo(_px,_py); started=true; } else ctx.lineTo(_px,_py);
+    }
+    ctx.stroke();
+  }
+}
+
+/** 前計算済みリング（Float32Array の xyz 列）を描画 */
+function drawRings(rings, front, style){
+  if (!rings) return;
+  ctx.lineWidth = style.lw;
+  ctx.strokeStyle = front ? style.front : style.back;
+  for (let i=0;i<rings.length;i++){
+    const a = rings[i];
+    if (style.fill && front){
+      // 塗り（日本のハイライト用）：表側に全点があるときだけ塗る
+      let ok = true; ctx.beginPath();
+      for (let k=0;k<a.length;k+=3){
+        pxyz(a[k],a[k+1],a[k+2],1.002);
+        if (_pz < 0){ ok=false; break; }
+        if (k===0) ctx.moveTo(_px,_py); else ctx.lineTo(_px,_py);
+      }
+      if (ok){ ctx.closePath(); ctx.fillStyle = style.fill; ctx.fill(); }
+    }
+    ctx.beginPath(); let started=false;
+    for (let k=0;k<a.length;k+=3){
+      pxyz(a[k],a[k+1],a[k+2],1.002);
+      if ((_pz>=0)!==front){ started=false; continue; }
+      if(!started){ ctx.moveTo(_px,_py); started=true; } else ctx.lineTo(_px,_py);
+    }
+    ctx.stroke();
+  }
+}
+
+/* --- 日本国内ゾーン（模式的な境界）と、それを囲む「国境フェンス」 ---
+   ap-northeast-1 / ap-northeast-3 を含み、ソウル以西の海外リージョンは含まない範囲。
+   越境判定とフェンス描画で同じ境界を使うので、演出と判定が必ず一致する。            */
+const JP_BOX = {lat0:29.5, lat1:46.5, lon0:129.2, lon1:147.5};
+let FENCE = null;
+function prepareFence(){
+  const {lat0,lat1,lon0,lon1} = JP_BOX, s = 1, pts = [];
+  for (let lon=lon0; lon<lon1; lon+=s) pts.push([lat0,lon]);
+  pts.push([lat0,lon1]);
+  for (let lat=lat0; lat<lat1; lat+=s) pts.push([lat,lon1]);
+  pts.push([lat1,lon1]);
+  for (let lon=lon1; lon>lon0; lon-=s) pts.push([lat1,lon]);
+  pts.push([lat1,lon0]);
+  for (let lat=lat1; lat>lat0; lat-=s) pts.push([lat,lon0]);
+  pts.push([lat0,lon0]);
+  FENCE = pts.map(p=>vec(p[0],p[1]));
+}
+/** 単位ベクトルが日本国内ゾーンの内側か */
+function inJapanZone(v){
+  const lat = Math.asin(Math.max(-1,Math.min(1,v.y)))/D2R;
+  const lon = Math.atan2(v.x, v.z)/D2R;
+  return lat>=JP_BOX.lat0 && lat<=JP_BOX.lat1 && lon>=JP_BOX.lon0 && lon<=JP_BOX.lon1;
+}
+function drawFence(front, tsec){
+  if (!FENCE) prepareFence();
+  const bad = isBad();
+  const pulse = 0.5 + 0.5*Math.sin(tsec*2.0);
+  const c = bad ? [255,77,94] : [47,217,122];
+  const rgba = (a)=> 'rgba('+c[0]+','+c[1]+','+c[2]+','+a+')';
+  const R0 = 1.004, R1 = 1.075;
+  ctx.save();
+  // 側面（薄い板を並べて「壁」に見せる）
+  const faceA = front ? (bad?0.06:0.09) + 0.05*pulse : 0.028;
+  ctx.fillStyle = rgba(faceA);
+  for (let i=0;i<FENCE.length-1;i++){
+    const a0 = projV(FENCE[i],R0), b0 = projV(FENCE[i+1],R0);
+    if ((a0.z>=0 && b0.z>=0) !== front) continue;
+    const a1 = projV(FENCE[i],R1), b1 = projV(FENCE[i+1],R1);
+    ctx.beginPath();
+    ctx.moveTo(a0.x,a0.y); ctx.lineTo(a1.x,a1.y); ctx.lineTo(b1.x,b1.y); ctx.lineTo(b0.x,b0.y);
+    ctx.closePath(); ctx.fill();
+  }
+  // 上端・下端の縁取り
+  ctx.shadowColor = rgba(.9);
+  [[R0,1.2],[R1,2.0]].forEach(function(cfg){
+    ctx.beginPath(); let st=false;
+    for (const v of FENCE){
+      const p = projV(v,cfg[0]);
+      if ((p.z>=0)!==front){ st=false; continue; }
+      if(!st){ ctx.moveTo(p.x,p.y); st=true; } else ctx.lineTo(p.x,p.y);
+    }
+    ctx.lineWidth = front ? cfg[1] : 1;
+    ctx.setLineDash(bad ? [6,5] : []);
+    ctx.strokeStyle = rgba(front ? 0.5+0.35*pulse : 0.14);
+    ctx.shadowBlur = front ? 12 : 0;
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  // ラベル
+  if (front){
+    const p = proj(JP_BOX.lat1, (JP_BOX.lon0+JP_BOX.lon1)/2, R1);
+    if (p.z > 0.15){
+      ctx.font = '700 11px "Segoe UI","Noto Sans JP",sans-serif';
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = rgba(.95);
+      ctx.textAlign = 'center';
+      ctx.fillText(bad ? '日本国内ゾーン（突破される）' : '日本国内ゾーン', p.x, p.y-8);
+      ctx.textAlign = 'start';
+    }
+  }
+  ctx.restore();
+}
+
+/* --- リージョンマーカー --- */
+function drawMarkers(front, tsec){
+  const ds = dests();
+  const active = {}; ds.forEach(k=>active[k]=true);
+  for (const key in REGIONS){
+    const rg = REGIONS[key];
+    const isDest = !!active[key], isSrc = key===SRC;
+    if (!isDest && !isSrc) continue;
+    const p = proj(rg.lat, rg.lon, 1.008);
+    if ((p.z>=0) !== front) continue;
+    const col = rg.jp ? '#2fd97a' : '#ff4d5e';
+    const hit = state.hits[key]||0;
+    const size = isSrc ? 5.5 : 4.2;
+    const a = front ? 1 : .22;
+    ctx.save(); ctx.globalAlpha = a;
+    // パルスリング（着地したリージョン）
+    if (hit>0 && front){
+      const ph = (tsec*1.1)%1;
+      ctx.beginPath(); ctx.arc(p.x,p.y, size+2 + ph*16, 0, 6.2832);
+      ctx.strokeStyle = col; ctx.globalAlpha = a*(1-ph)*0.7; ctx.lineWidth=1.6; ctx.stroke();
+      ctx.globalAlpha = a;
+    }
+    ctx.beginPath(); ctx.arc(p.x,p.y,size,0,6.2832);
+    ctx.fillStyle = col; ctx.shadowColor = col; ctx.shadowBlur = front?12:0; ctx.fill();
+    ctx.shadowBlur = 0;
+    if (isSrc){ ctx.beginPath(); ctx.arc(p.x,p.y,size+3.5,0,6.2832); ctx.strokeStyle='#fff'; ctx.lineWidth=1.4; ctx.stroke(); }
+    // ラベル
+    if (front){
+      const showLabel = state.cam.zoom>0.95 || rg.jp || hit>0;
+      if (showLabel){
+        const txt = rg.label + (hit>0? '  ('+hit+')' : '');
+        ctx.font = '600 11px "Segoe UI","Noto Sans JP",sans-serif';
+        const w = ctx.measureText(txt).width;
+        ctx.globalAlpha = a*0.86;
+        ctx.fillStyle='rgba(5,8,20,.72)';
+        ctx.beginPath(); ctx.roundRect(p.x+9, p.y-9, w+12, 18, 5); ctx.fill();
+        ctx.globalAlpha = a;
+        ctx.fillStyle = rg.jp ? '#c7f7dc' : '#ffd7db';
+        ctx.fillText(txt, p.x+15, p.y+4);
+      }
+    }
+    ctx.restore();
+  }
+}
+
+/* --- アーク（大圏経路） --- */
+/** 単位ベクトル c の接平面の正規直交基底 */
+function tangentBasis(c){
+  let up = (Math.abs(c.y) > 0.99) ? {x:1,y:0,z:0} : {x:0,y:1,z:0};
+  let e1 = {x: up.y*c.z-up.z*c.y, y: up.z*c.x-up.x*c.z, z: up.x*c.y-up.y*c.x};
+  const n = Math.hypot(e1.x,e1.y,e1.z);
+  e1 = {x:e1.x/n, y:e1.y/n, z:e1.z/n};
+  const e2 = {x: c.y*e1.z-c.z*e1.y, y: c.z*e1.x-c.x*e1.z, z: c.x*e1.y-c.y*e1.x};
+  return {e1:e1, e2:e2};
+}
+function arcPath(from, to){
+  const a = vec(REGIONS[from].lat, REGIONS[from].lon);
+  const b = vec(REGIONS[to].lat, REGIONS[to].lon);
+  if (from === to){
+    // 同一リージョン（リージョン内推論）はその場を小さく一周させて
+    // 「ネットワークを跨がず処理が完結する」ことを表す
+    const tb = tangentBasis(a);
+    return {a:a, b:b, ang:0, h:0.05, self:true, e1:tb.e1, e2:tb.e2, rad:2.4*D2R};
+  }
+  const ang = angDist(a,b);
+  const h = Math.min(0.42, 0.05 + ang*0.20);
+  return {a:a, b:b, ang:ang, h:h, self:false};
+}
+function arcPoint(path, t){
+  const h = Math.min(path.h, CAM.altCap);
+  let v;
+  if (path.self){
+    const th = t*Math.PI*2, ca = Math.cos(path.rad), sa = Math.sin(path.rad);
+    const c1 = Math.cos(th), s1 = Math.sin(th);
+    v = {x: path.a.x*ca + (path.e1.x*c1 + path.e2.x*s1)*sa,
+         y: path.a.y*ca + (path.e1.y*c1 + path.e2.y*s1)*sa,
+         z: path.a.z*ca + (path.e1.z*c1 + path.e2.z*s1)*sa};
+  } else {
+    v = slerp(path.a, path.b, t);
+  }
+  const r = 1 + h * Math.sin(Math.PI*t);
+  const n = Math.hypot(v.x,v.y,v.z);
+  return {v:{x:v.x/n,y:v.y/n,z:v.z/n}, r:r};
+}
+function strokeArc(path, t0, t1, color, lw, glow){
+  const N = 44;
+  ctx.save();
+  ctx.lineWidth = lw; ctx.lineCap='round';
+  if (glow){ ctx.shadowColor = color; ctx.shadowBlur = glow; }
+  let started=false; ctx.beginPath();
+  let backSegs=[];
+  for (let i=0;i<=N;i++){
+    const t = t0 + (t1-t0)*i/N;
+    const ap = arcPoint(path, t);
+    const p = projV(ap.v, ap.r);
+    if (p.hidden){ if(started){started=false;} backSegs.push(p); continue; }
+    if(!started){ ctx.moveTo(p.x,p.y); started=true; } else ctx.lineTo(p.x,p.y);
+  }
+  ctx.strokeStyle = color; ctx.stroke();
+  ctx.restore();
+  // 裏側は薄く（ガラス球のように透けて見せる）
+  if (backSegs.length>1){
+    ctx.save(); ctx.globalAlpha=.22; ctx.lineWidth=Math.max(1,lw*0.7);
+    ctx.setLineDash([3,4]); ctx.strokeStyle=color; ctx.beginPath();
+    backSegs.forEach((p,i)=> i===0?ctx.moveTo(p.x,p.y):ctx.lineTo(p.x,p.y));
+    ctx.stroke(); ctx.restore();
+  }
+}
+
+/* --- パケット（推論リクエスト）の生成と描画 --- */
+/** フローを頭から作り直す（カウンタとログもクリア） */
+function restartFlow(){
+  state.t = 0;
+  state.crossCount = 0;
+  state.hits = {};
+  state.packets = buildPackets();
+  bursts.length = 0;
+  const lg = document.getElementById('log');
+  if (lg) lg.innerHTML = '';
+  lastPhase = -1;
+  renderDist(); renderCross();
+}
+function buildPackets(){
+  const ds = dests();
+  const list = [];
+  for (let i=0;i<EMIT_N;i++){
+    // 宛先候補を均等に舐めて「自動的に分散される」様子を表現する
+    const k = ds[Math.min(ds.length-1, Math.floor(i*ds.length/EMIT_N))];
+    list.push({dest:k, t0:EMIT_START + i*EMIT_GAP, crossed:false, logged:false, path:arcPath(SRC,k)});
+  }
+  return list;
+}
+function packetPhase(pk, t){
+  const dt = t - pk.t0;
+  if (dt < 0) return null;
+  if (dt < OUT_MS) return {ph:'out', p: dt/OUT_MS};
+  if (dt < OUT_MS+COMP_MS) return {ph:'comp', p:(dt-OUT_MS)/COMP_MS};
+  if (dt < OUT_MS+COMP_MS+IN_MS) return {ph:'in', p:(dt-OUT_MS-COMP_MS)/IN_MS};
+  return {ph:'done', p:1};
+}
+function drawFlow(tsec){
+  const t = state.t;
+  for (const pk of state.packets){
+    const st = packetPhase(pk, t);
+    if (!st) continue;
+    const outside = !REGIONS[pk.dest].jp;
+    const col = outside ? '#ff6b78' : '#ffb133';
+
+    // 経路（薄く常時表示）
+    if (st.ph!=='done') strokeArc(pk.path, 0, 1, outside? 'rgba(255,107,120,.20)':'rgba(255,177,51,.22)', 1.2, 0);
+
+    if (st.ph==='out' || st.ph==='in'){
+      const fwd = st.ph==='out';
+      const prog = fwd ? st.p : 1-st.p;
+      // 進んだ分だけ濃く
+      const tail = Math.max(0, prog - 0.22), head = prog;
+      strokeArc(pk.path, fwd?tail:head, fwd?head:Math.min(1,head+0.22),
+                fwd? col : (outside? '#7ad8ff' : '#7ad8ff'), 2.6, 12);
+      // 先頭の光点
+      const ap = arcPoint(pk.path, prog);
+      const p = projV(ap.v, ap.r);
+      if (!p.hidden){
+        ctx.save();
+        ctx.shadowColor = fwd? col : '#7ad8ff'; ctx.shadowBlur = 16;
+        ctx.fillStyle = fwd? '#ffe1a8' : '#d6f4ff';
+        ctx.beginPath(); ctx.arc(p.x,p.y, 3.6, 0, 6.2832); ctx.fill();
+        ctx.restore();
+      }
+      // 国境越え判定：日本国内ゾーンの外へ出た瞬間
+      if (fwd && outside && !pk.crossed && !inJapanZone(ap.v)){
+        pk.crossed = true; state.crossCount++;
+        flashCross(p);
+        renderCross();
+      }
+    } else if (st.ph==='comp'){
+      // 宛先で推論中
+      const rg = REGIONS[pk.dest];
+      const p = proj(rg.lat, rg.lon, 1.01);
+      if (!p.hidden && p.z>=0){
+        const rr = 6 + 12*Math.sin(st.p*Math.PI);
+        ctx.save();
+        ctx.strokeStyle = outside? 'rgba(255,107,120,.9)' : 'rgba(255,177,51,.9)';
+        ctx.lineWidth=2; ctx.shadowColor=ctx.strokeStyle; ctx.shadowBlur=14;
+        ctx.beginPath(); ctx.arc(p.x,p.y,rr,0,6.2832); ctx.stroke(); ctx.restore();
+      }
+      if (!pk.hitCounted){ pk.hitCounted=true; state.hits[pk.dest]=(state.hits[pk.dest]||0)+1; renderDist(); }
+    } else if (st.ph==='done' && !pk.logged){
+      pk.logged = true; pushLog(pk);
+    }
+  }
+}
+
+/* 国境越えエフェクト */
+const bursts = [];
+function flashCross(p){
+  bursts.push({x:p.x, y:p.y, t:performance.now()});
+  const b = document.getElementById('crossBanner');
+  b.classList.add('show');
+  clearTimeout(flashCross._to);
+  flashCross._to = setTimeout(()=>b.classList.remove('show'), 1400);
+  document.getElementById('srLive').textContent = '国境を越えました。累計 ' + state.crossCount + ' 件。';
+}
+function drawBursts(now){
+  for (let i=bursts.length-1;i>=0;i--){
+    const b = bursts[i], age = (now-b.t)/700;
+    if (age>1){ bursts.splice(i,1); continue; }
+    ctx.save();
+    ctx.globalAlpha = 1-age; ctx.strokeStyle='#ff4d5e'; ctx.lineWidth=2.4;
+    ctx.shadowColor='#ff4d5e'; ctx.shadowBlur=18;
+    ctx.beginPath(); ctx.arc(b.x,b.y, 4+age*30, 0, 6.2832); ctx.stroke();
+    ctx.font='700 11px "Segoe UI","Noto Sans JP",sans-serif'; ctx.fillStyle='#ffd7db';
+    ctx.fillText('国境', b.x+8, b.y-8);
+    ctx.restore();
+  }
+}
+
+/* =======================================================================
+   8. メインループ
+   ======================================================================= */
+let last = performance.now();
+function frame(now){
+  const dt = Math.min(64, now-last); last = now;
+
+  // カメラのイージング
+  const c = state.cam, ct = state.camTarget;
+  let dl = ((ct.lon - c.lon + 540)%360)-180;
+  c.lon += dl*0.06; c.lat += (ct.lat-c.lat)*0.08; c.zoom += (ct.zoom-c.zoom)*0.08;
+  if (state.spin && !state.drag){ c.lon += 0.0065*dt; ct.lon = c.lon; }  // 約 6.5°/秒
+  camUpdate();
+
+  // タイムライン
+  if (state.playing){
+    state.t += dt*state.speed;
+    if (state.t >= CYCLE){
+      if (state.loop){ state.t = 0; state.packets = buildPackets(); }
+      else { state.t = CYCLE; state.playing = false; syncPlayBtn(); }
+    }
+  }
+  const tsec = now/1000;
+
+  ctx.clearRect(0,0,W,H);
+  drawSphere();
+  drawGraticule(false);
+  drawRings(GEOV && GEOV.w, false, {lw:0.7, front:'', back:'rgba(190,205,255,.13)'});
+  drawGraticule(true);
+  drawRings(GEOV && GEOV.w, true,  {lw:0.9, front:'rgba(214,226,255,.62)', back:''});
+  drawRings(GEOV && GEOV.j, true,  {lw:1.6, front:'rgba(120,255,180,.95)', back:'', fill:'rgba(47,217,122,.30)'});
+  drawFence(false, tsec);
+  drawFence(true, tsec);
+  drawFlow(tsec);
+  drawMarkers(false, tsec);
+  drawMarkers(true, tsec);
+  drawBursts(now);
+
+  updateScrub();
+  updateSteps();
+  requestAnimationFrame(frame);
+}
+
+/* =======================================================================
+   9. UI 描画
+   ======================================================================= */
+function renderModels(){
+  const box = document.getElementById('models');
+  box.innerHTML = '';
+  MODELS.forEach(m=>{
+    const on = m.key===state.modelKey;
+    const el = document.createElement('label');
+    el.className = 'mcard'+(on?' on':'');
+    const tags = SCOPE_ORDER.filter(s=>m.v[s]).map(s=>
+      '<span class="tag t-'+s+'">'+(s==='inRegion'?'東京のみ':SCOPES[s].sub)+'</span>').join('');
+    el.innerHTML =
+      '<input type="radio" name="model" value="'+m.key+'"'+(on?' checked':'')+'>'+
+      '<div class="mrow"><span class="mname">'+m.name+'</span>'+
+        (m.gennai?'<span class="badge-gennai">源内Web 既定</span>':'')+
+        '<span class="mvendor">'+m.vendor+'</span></div>'+
+      '<div class="mtags">'+tags+'</div>';
+    el.querySelector('input').addEventListener('change', ()=>{
+      state.modelKey = m.key;
+      if (!m.v[state.scopeKey]) state.scopeKey = SCOPE_ORDER.find(s=>m.v[s]);
+      applyChange();
+    });
+    box.appendChild(el);
+  });
+}
+function renderScopes(){
+  const m = model(), box = document.getElementById('scopes');
+  box.innerHTML = '';
+  SCOPE_ORDER.forEach(k=>{
+    const sc = SCOPES[k], v = m.v[k], na = !v;
+    const on = k===state.scopeKey && !na;
+    const el = document.createElement('label');
+    el.className = 'scope'+(on?' on '+sc.tone:'')+(na?' na':'');
+    el.innerHTML =
+      '<input type="radio" name="scope" value="'+k+'"'+(on?' checked':'')+(na?' disabled':'')+'>'+
+      '<span class="ico" aria-hidden="true">'+sc.ico+'</span>'+
+      '<span><span class="t1">'+sc.label+'</span><br><span class="t2">'+sc.sub+
+        (v? ' → 宛先 '+v.d.length+(k==='global'?'+':'')+' リージョン':'')+'</span></span>'+
+      '<span class="vd" aria-hidden="true">'+(na?'—':sc.mark)+'</span>'+
+      (na?'<span class="na-note">このモデルにこのスコープの推論プロファイルはありません</span>':'');
+    if (!na) el.querySelector('input').addEventListener('change', ()=>{ state.scopeKey=k; applyChange(); });
+    box.appendChild(el);
+  });
+}
+function renderModelId(){
+  const v = variant(), out = document.getElementById('modelIdOut');
+  if (!v){ out.textContent='—'; return; }
+  const k = state.scopeKey;
+  if (k==='inRegion'){
+    out.innerHTML = '<span style="color:#9ff2c4">'+v.id+'</span>';
+    document.getElementById('idHint').innerHTML = 'プレフィックスなし＝<b>基盤モデル ID</b>。呼び出したリージョン（東京）でそのまま推論されます。';
+  } else {
+    const cls = k==='jp' ? 'pfx jp' : (isBad()? 'pfx bad':'pfx');
+    const rest = v.id.slice(SCOPES[k].sub.length);
+    out.innerHTML = '<span class="'+cls+'">'+SCOPES[k].sub+'</span>'+rest;
+    document.getElementById('idHint').innerHTML =
+      'プレフィックス <code>'+SCOPES[k].sub+'</code> ＝<b>推論プロファイル ID</b>。'+
+      (k==='jp' ? '宛先は東京・大阪のみ。' : '宛先に国外リージョンが含まれます。');
+  }
+}
+function renderVerdict(){
+  const sc = SCOPES[state.scopeKey], v = variant(), ds = dests();
+  const jpOnly = ds.every(k=>REGIONS[k].jp);
+  const el = document.getElementById('verdict');
+  el.className = 'verdict '+(jpOnly?'good':'bad');
+  const outCount = ds.filter(k=>!REGIONS[k].jp).length;
+  const countries = Array.from(new Set(ds.filter(k=>!REGIONS[k].jp).map(k=>REGIONS[k].country)));
+  el.innerHTML =
+    '<div class="vhead"><span class="vmark" aria-hidden="true">'+(jpOnly?'🛡':'⚠')+'</span>'+
+      '<span><span class="vtitle">'+(jpOnly?'デジタル主権：守られる':'デジタル主権：守られない')+'</span><br>'+
+      '<span class="vdesc">'+sc.title+'</span></span></div>'+
+    '<dl class="kv">'+
+      '<dt>推論スコープ</dt><dd>'+sc.label+'</dd>'+
+      '<dt>宛先リージョン</dt><dd>'+ds.length+(state.scopeKey==='global'?'+':'')+' 件'+
+        (outCount? '（うち国外 '+outCount+'+）':'（すべて国内）')+'</dd>'+
+      '<dt>国外の国・地域</dt><dd>'+(countries.length? countries.slice(0,4).join(' / ')+(state.scopeKey==='global'?' ほか':''):'なし')+'</dd>'+
+      '<dt>データレジデンシー</dt><dd>'+(jpOnly?'国内要件を満たせる':'国内要件を満たせない')+'</dd>'+
+      '<dt>料金の目安</dt><dd>'+(state.scopeKey==='global'?'基準（最安）':(state.scopeKey==='inRegion'?'東京の通常料金':'グローバル比 +10%'))+'</dd>'+
+      '<dt>スループット</dt><dd>'+(state.scopeKey==='global'?'最大':(state.scopeKey==='inRegion'?'単一リージョン依存':'国内 2 リージョン分'))+'</dd>'+
+    '</dl>';
+  // HUD
+  document.getElementById('chipScope').innerHTML = sc.ico+' <b>'+(v?v.id:'—')+'</b>';
+  document.getElementById('chipDest').innerHTML = '宛先候補 <b>'+ds.length+(state.scopeKey==='global'?'+':'')+'</b> リージョン';
+  cvs.setAttribute('aria-label',
+    '地球儀。ソースは東京リージョン。'+sc.label+'により宛先は'+ds.map(k=>REGIONS[k].label).join('、')+'。'+
+    (jpOnly?'国境を越えません。':'国境を越えます。'));
+}
+function renderCross(){
+  const c = document.getElementById('chipCross');
+  c.className = 'chip '+(state.crossCount>0?'alert':'ok');
+  c.innerHTML = state.crossCount>0 ? '⚠ 越境 <b>'+state.crossCount+'</b> 件' : '🛡 越境 <b>0</b> 件';
+}
+function renderDist(){
+  const ds = dests(), box = document.getElementById('dist');
+  const total = Math.max(1, Object.values(state.hits).reduce((a,b)=>a+b,0));
+  box.innerHTML = ds.map(k=>{
+    const rg = REGIONS[k], n = state.hits[k]||0, w = Math.round(n/total*100);
+    return '<div class="d"><span class="nm" title="'+k+'">'+(rg.jp?'🇯🇵 ':'')+rg.label+'</span>'+
+      '<span class="bar"><i class="'+(rg.jp?'':'out')+'" style="width:'+w+'%"></i></span>'+
+      '<span class="ct">'+n+'</span></div>';
+  }).join('');
+}
+function renderSteps(){
+  const box = document.getElementById('steps');
+  box.innerHTML = PHASES.map((p,i)=>
+    '<div class="step" data-i="'+i+'"><span class="num">'+(i+1)+'</span>'+
+    '<span><span class="st1">'+p.t1+'</span><br><span class="st2">'+p.t2+'</span></span></div>').join('');
+  const marks = document.getElementById('marks');
+  marks.innerHTML = PHASES.map(p=>'<span class="mk" style="left:'+(p.t[0]/CYCLE*100)+'%"></span>').join('');
+  document.getElementById('tlTotal').textContent = (CYCLE/1000).toFixed(1)+'s';
+}
+let lastPhase = -1;
+function updateSteps(){
+  const t = state.t;
+  let cur = -1;
+  for (let i=0;i<PHASES.length;i++) if (t>=PHASES[i].t[0] && t<PHASES[i].t[1]) cur=i;
+  if (cur!==lastPhase){
+    lastPhase = cur;
+    document.querySelectorAll('.step').forEach((el,i)=>{
+      el.classList.toggle('act', i===cur);
+      el.classList.toggle('done', i<cur);
+      el.classList.toggle('cross', i===cur && isBad() && i>=3);
+    });
+    document.getElementById('tlPhase').textContent = cur>=0 ? (cur+1)+'. '+PHASES[cur].t1 : '—';
+  }
+}
+function updateScrub(){
+  const p = Math.min(1, state.t/CYCLE);
+  document.getElementById('fill').style.width = (p*100)+'%';
+  document.getElementById('tlNow').textContent = (state.t/1000).toFixed(1)+'s';
+  document.getElementById('track').setAttribute('aria-valuenow', Math.round(p*100));
+}
+function pushLog(pk){
+  const rg = REGIONS[pk.dest], box = document.getElementById('log');
+  const ln = document.createElement('div');
+  ln.className='ln';
+  const ts = new Date(Date.now()).toISOString().slice(11,19);
+  ln.innerHTML = '<span class="t">'+ts+'</span>'+
+    '<span>inferenceRegion=<span class="r '+(rg.jp?'jp':'out')+'">'+pk.dest+'</span></span>'+
+    '<span class="m">'+(rg.jp?'国内':'⚠ 国外 / '+rg.country)+'</span>';
+  box.appendChild(ln);
+  while (box.childElementCount > 60) box.removeChild(box.firstElementChild);
+  box.scrollTop = box.scrollHeight;
+}
+
+/* =======================================================================
+   10. カメラプリセット
+   ======================================================================= */
+function focusFor(scope){
+  if (scope==='inRegion') return {lon:139, lat:34, zoom:1.5};
+  if (scope==='jp')       return {lon:137, lat:33, zoom:1.42};
+  if (scope==='apac')     return {lon:120, lat:8,  zoom:1.05};
+  return {lon:150, lat:20, zoom:0.92};
+}
+function applyChange(){
+  renderModels(); renderScopes(); renderModelId(); renderVerdict();
+  restartFlow();
+  const f = focusFor(state.scopeKey);
+  state.camTarget = {lon:f.lon, lat:f.lat, zoom:f.zoom};
+  state.spin = (state.scopeKey==='global') && !reduceMotion;
+  document.getElementById('btnSpin').classList.toggle('on', state.spin);
+}
+
+/* =======================================================================
+   11. イベント
+   ======================================================================= */
+function syncPlayBtn(){
+  const b=document.getElementById('btnPlay');
+  b.textContent = state.playing ? '⏸ 一時停止' : '▶ 再生';
+}
+document.getElementById('btnPlay').addEventListener('click',()=>{
+  if (!state.playing && state.t>=CYCLE) restartFlow();
+  state.playing=!state.playing; syncPlayBtn();
+});
+document.getElementById('btnReset').addEventListener('click',()=>{
+  restartFlow(); state.playing=true; syncPlayBtn();
+});
+document.getElementById('btnLoop').addEventListener('click',(e)=>{
+  state.loop=!state.loop;
+  e.currentTarget.classList.toggle('on',state.loop);
+  e.currentTarget.setAttribute('aria-pressed',String(state.loop));
+});
+document.querySelectorAll('.speed button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    state.speed=parseFloat(b.dataset.sp);
+    document.querySelectorAll('.speed button').forEach(x=>x.classList.toggle('on',x===b));
+  });
+});
+document.getElementById('btnJp').addEventListener('click',()=>{
+  state.spin=false; document.getElementById('btnSpin').classList.remove('on');
+  state.camTarget={lon:137,lat:33,zoom:1.42};
+});
+document.getElementById('btnWorld').addEventListener('click',()=>{
+  state.camTarget={lon:150,lat:18,zoom:0.88};
+});
+document.getElementById('btnSpin').addEventListener('click',(e)=>{
+  state.spin=!state.spin; e.currentTarget.classList.toggle('on',state.spin);
+});
+document.getElementById('btnCopy').addEventListener('click',async()=>{
+  const v=variant(); if(!v) return;
+  try{ await navigator.clipboard.writeText(v.id);
+    const b=document.getElementById('btnCopy'); const o=b.textContent; b.textContent='コピー済';
+    setTimeout(()=>b.textContent=o,1200);
+  }catch(_){}
+});
+/* タイムラインのシーク */
+const track=document.getElementById('track');
+function seekAt(clientX){
+  const r=track.getBoundingClientRect();
+  const p=Math.max(0,Math.min(1,(clientX-r.left)/r.width));
+  state.t = p*CYCLE; lastPhase=-1;
+  // シーク位置に合わせてパケット状態を作り直す
+  state.packets = buildPackets(); state.hits={}; state.crossCount=0;
+  document.getElementById('log').innerHTML='';
+  state.packets.forEach(pk=>{
+    const st=packetPhase(pk,state.t);
+    if(st && st.ph!=='out'){ pk.hitCounted=true; state.hits[pk.dest]=(state.hits[pk.dest]||0)+1; }
+    if(st && st.ph==='done'){ pk.logged=true; pushLog(pk); }
+    if(st && !REGIONS[pk.dest].jp && st.ph!=='out'){ pk.crossed=true; state.crossCount++; }
+  });
+  renderDist(); renderCross();
+}
+track.addEventListener('pointerdown',e=>{ seekAt(e.clientX); track.setPointerCapture(e.pointerId); track._d=true; });
+track.addEventListener('pointermove',e=>{ if(track._d) seekAt(e.clientX); });
+track.addEventListener('pointerup',()=>{ track._d=false; });
+track.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'){ state.t=Math.min(CYCLE,state.t+400); lastPhase=-1; e.preventDefault(); }
+  if(e.key==='ArrowLeft'){ state.t=Math.max(0,state.t-400); lastPhase=-1; e.preventDefault(); }
+});
+/* 地球儀のドラッグ回転・ズーム */
+cvs.addEventListener('pointerdown',e=>{
+  state.drag={x:e.clientX,y:e.clientY,lon:state.cam.lon,lat:state.cam.lat};
+  cvs.setPointerCapture(e.pointerId);
+});
+cvs.addEventListener('pointermove',e=>{
+  if(!state.drag) return;
+  const k = 0.32/state.cam.zoom;
+  state.camTarget.lon = state.drag.lon - (e.clientX-state.drag.x)*k;
+  state.camTarget.lat = Math.max(-80,Math.min(80, state.drag.lat + (e.clientY-state.drag.y)*k));
+  state.cam.lon = state.camTarget.lon; state.cam.lat = state.camTarget.lat;
+});
+cvs.addEventListener('pointerup',()=>{ state.drag=null; });
+cvs.addEventListener('pointercancel',()=>{ state.drag=null; });
+cvs.addEventListener('wheel',e=>{
+  e.preventDefault();
+  state.camTarget.zoom = Math.max(0.65, Math.min(2.2, state.camTarget.zoom * (e.deltaY<0?1.12:0.9)));
+},{passive:false});
+cvs.addEventListener('dblclick',()=>{ const f=focusFor(state.scopeKey); state.camTarget={lon:f.lon,lat:f.lat,zoom:f.zoom}; });
+
+/* roundRect が無い環境向けの簡易ポリフィル */
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect){
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+    this.moveTo(x+r,y); this.arcTo(x+w,y,x+w,y+h,r); this.arcTo(x+w,y+h,x,y+h,r);
+    this.arcTo(x,y+h,x,y,r); this.arcTo(x,y,x+w,y,r); this.closePath(); return this;
+  };
+}
+
+/* =======================================================================
+   12. 起動
+   ======================================================================= */
+resize();
+prepareGeo();
+camUpdate();
+renderSteps();
+applyChange();
+syncPlayBtn();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
