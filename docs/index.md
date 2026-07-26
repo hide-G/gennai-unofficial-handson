@@ -9,9 +9,8 @@
 Amazon Web Services (AWS) 社製オープンソース Generative AI Use Cases (GenU) をベースに、
 機能開発が行われています。
 
-・「源内 Web（AI インターフェース）」と「源内 AI アプリ」の分離
-<br>
-・「源内 AI アプリ」は他のガバメントクラウドでも作成できるように仕様を決定
+- 「源内 Web（AI インターフェース）」と「源内 AI アプリ」の分離
+- 「源内 AI アプリ」は他のガバメントクラウドでも作成できるように仕様を決定
 
 ## 主要な構成要素
 
@@ -24,7 +23,7 @@ Amazon Web Services (AWS) 社製オープンソース Generative AI Use Cases (G
 
 - 源内 Web: <https://github.com/digital-go-jp/genai-web>
 - 源内 AI アプリ: <https://github.com/digital-go-jp/genai-ai-api>
-<br>
+
 ※ AWS向けの「行政実務用ＲＡＧ（検索拡張生成）の開発テンプレート」のみ扱います。
 
 ## このサイトについて
