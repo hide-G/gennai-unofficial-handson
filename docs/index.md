@@ -32,6 +32,8 @@ Amazon Web Services (AWS) 社製オープンソース Generative AI Use Cases (G
 - 対象読者や前提条件は [このハンズオンの対象](audience.md) を参照してください
 - 章の順序は左のナビゲーションを参照してください
 
+※ GenUのWorkshop: <https://catalog.workshops.aws/generative-ai-use-cases-jp/ja-JP> と同じ粒度のものがあれば源内への理解が進むのではないかとの思いで作成しました。
+
 ## サイトの使い方
 
 - 上部の検索欄からキーワード検索ができます
