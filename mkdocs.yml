@@ -31,10 +31,9 @@ nav:
   - "第3章 AWSアカウントの注意（コスト、権限、リージョン）": aws-notes.md
   - "第4章 源内 Web（AI インターフェース）": web.md
   - "第5章 源内 AI アプリのデプロイ": deploy-ai-api.md
-  - "第6章 動作確認": verify.md
-  - "第7章 後片付け": cleanup.md
-  - "第8章 想定質問集（FAQ）": faq.md
-  - "第9章 用語集・参考リンク": glossary.md
+  - "第6章 後片付け": cleanup.md
+  - "第7章 想定質問集（FAQ）": faq.md
+  - "第8章 用語集・参考リンク": glossary.md
 
 plugins:
   - search
