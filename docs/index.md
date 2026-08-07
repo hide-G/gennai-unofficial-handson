@@ -46,3 +46,5 @@ Amazon Web Services (AWS) 社製オープンソース Generative AI Use Cases (G
 登壇で使用したスライドです。
 
 - 源内ハンズオン概要編: <https://speakerdeck.com/hideg/yuan-nei-hanzuongai-yao-bian>
+
+![源内ハンズオン概要編のタイトルスライド。上部に「【コラボ企画】Gov-JAWS#8 JAWS-UG AI/ML支部コラボ：」と「源内ハンズオン勉強会」、中央にガバメントAI 源内の日本語版ロゴと英語版ロゴ（Government AI GENAI）、右下に「概要編」「2026/8/7」「長田英幸」、左下にロゴの出典URLが記載されている。](images/源内ハンズオン概要編.png){ width="100%" }
