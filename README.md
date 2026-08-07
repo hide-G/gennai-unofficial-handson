@@ -56,6 +56,8 @@ Actionsは、GitHub公式のPages関連Actions（`configure-pages`、`upload-pag
 
 資料本文は `docs/` 配下のMarkdownを編集すれば更新できます。
 
+第4章と第5章は現在メンテナンス表示にしており、本文は `docs/*_draft.md` に退避しています。下書きの閲覧方法、再公開の手順、コンフリクトの対処、マージ時の制約は[メンテナンス運用メモ](MAINTENANCE.md)にまとめています。これらの章を触る前に必ず目を通してください。
+
 - `docs/*.md`: 各章の本文（`mkdocs.yml` の `nav` に登録された順に表示されます）
 - `docs/stylesheets/theme.css`: サイトテーマ色（AWSオレンジ）
 - `docs/stylesheets/print.css`: A4印刷とPDF保存のスタイル
@@ -68,8 +70,8 @@ Actionsは、GitHub公式のPages関連Actions（`configure-pages`、`upload-pag
 - 第1章 ガバメントAI「源内」の概要
 - 第2章 システムアーキテクチャの紹介
 - 第3章 AWSアカウントの注意（コスト、権限、リージョン）
-- 第4章 源内 Web（AI インターフェース）
-- 第5章 源内 AI アプリのデプロイ
+- 第4章 源内 Web（AI インターフェース）（メンテナンス中）
+- 第5章 源内 AI アプリのデプロイ（メンテナンス中）
 - 第6章 後片付け
 - 第7章 想定質問集（FAQ）
 - 第8章 用語集・参考リンク
