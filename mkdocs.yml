@@ -35,6 +35,14 @@ nav:
   - "第7章 想定質問集（FAQ）": faq.md
   - "第8章 用語集・参考リンク": glossary.md
 
+# *_draft.md は下書き扱い。`mkdocs serve`（ローカル）では閲覧できるが、
+# `mkdocs build`（GitHub Pages へのデプロイ）には含まれない。
+draft_docs: |
+  *_draft.md
+
+not_in_nav: |
+  *_draft.md
+
 plugins:
   - search
   - enumerate-headings:
