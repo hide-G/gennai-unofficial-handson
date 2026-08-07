@@ -40,3 +40,9 @@ Amazon Web Services (AWS) 社製オープンソース Generative AI Use Cases (G
 - コードブロックの右上のアイコンを押すと、ブロック全体をクリップボードへコピーできます
 - ナビゲーションの **A4印刷 / PDF保存** を開き、ブラウザーの印刷画面からA4縦・PDF保存を選択すると、全ページをまとめたPDFを保存できます
 - ライトモードとダークモードは、ヘッダー右上のアイコンから切り替えできます
+
+## スライド資料
+
+登壇で使用したスライドです。
+
+- 源内ハンズオン概要編: <https://speakerdeck.com/hideg/yuan-nei-hanzuongai-yao-bian>
