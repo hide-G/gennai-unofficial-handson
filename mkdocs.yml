@@ -28,15 +28,13 @@ theme:
 nav:
   - "第1章 ガバメントAI「源内」の概要": index.md
   - "第2章 システムアーキテクチャの紹介": architecture.md
-  - "第3章 このハンズオンの対象": audience.md
-  - "第4章 事前準備（GitHubアカウント、AWSアカウント、必要ツール）": prerequisites.md
-  - "第5章 AWSアカウントの注意（コスト、権限、リージョン）": aws-notes.md
-  - "第6章 源内 Web（AI インターフェース）": web.md
-  - "第7章 源内 AI アプリのデプロイ": deploy-ai-api.md
-  - "第8章 動作確認": verify.md
-  - "第9章 後片付け": cleanup.md
-  - "第10章 想定質問集（FAQ）": faq.md
-  - "第11章 用語集・参考リンク": glossary.md
+  - "第3章 AWSアカウントの注意（コスト、権限、リージョン）": aws-notes.md
+  - "第4章 源内 Web（AI インターフェース）": web.md
+  - "第5章 源内 AI アプリのデプロイ": deploy-ai-api.md
+  - "第6章 動作確認": verify.md
+  - "第7章 後片付け": cleanup.md
+  - "第8章 想定質問集（FAQ）": faq.md
+  - "第9章 用語集・参考リンク": glossary.md
 
 plugins:
   - search
