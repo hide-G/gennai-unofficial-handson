@@ -266,3 +266,69 @@ Markdown 側に番号を手書きしないでください。`strict: true` か�
 - **gh コマンドの日本語**: `gh pr create --title "日本語"` は文字化けします。JSON ファイルを
   UTF-8 で用意して `gh api --method POST repos/<owner>/<repo>/pulls --input <file>` を使うと
   確実です。
+
+---
+
+## 10. ファイル構成と履歴の在り処
+
+### docs 配下と章の対応
+
+`mkdocs.yml` の `nav` に登録された順に表示されます。見出し番号（4.3 など）は
+`enumerate-headings` プラグインが自動採番するため、Markdown 側に番号を書かないでください。
+
+| ファイル | 章 | 状態 |
+| --- | --- | --- |
+| `docs/index.md` | 第1章 ガバメントAI「源内」の概要 | 公開 |
+| `docs/architecture.md` | 第2章 システムアーキテクチャの紹介 | 公開 |
+| `docs/aws-notes.md` | 第3章 AWSアカウントの注意 | 公開 |
+| `docs/web.md` | 第4章 源内 Web | **メンテナンス表示** |
+| `docs/web_draft.md` | 第4章の本文 | サイト非公開（`mkdocs serve` のみ） |
+| `docs/deploy-ai-api.md` | 第5章 源内 AI アプリのデプロイ | **メンテナンス表示** |
+| `docs/deploy-ai-api_draft.md` | 第5章の本文 | サイト非公開（`mkdocs serve` のみ） |
+| `docs/cleanup.md` | 第6章 後片付け | 公開 |
+| `docs/faq.md` | 第7章 想定質問集（FAQ） | 公開 |
+| `docs/glossary.md` | 第8章 用語集・参考リンク | 公開 |
+
+その他のリソースです。
+
+| パス | 役割 |
+| --- | --- |
+| `docs/images/` | 図と画像 |
+| `docs/stylesheets/theme.css` | サイトテーマ色 |
+| `docs/stylesheets/print.css` | A4印刷・PDF保存のスタイル |
+| `docs/javascripts/sidebar-toggle.js` | サイドバー開閉 |
+| `docs/sovereignty-globe/index.html` | リージョン主権の図 |
+
+### ルートのファイル
+
+| ファイル | 役割 |
+| --- | --- |
+| `mkdocs.yml` | サイト設定。`nav`、プラグイン、`draft_docs`（非公開指定） |
+| `README.md` | サイトの説明、ローカルプレビュー、公開手順、章立て |
+| `MAINTENANCE.md` | このファイル。メンテナンス運用と引き継ぎ情報 |
+| `LOCAL_DEVELOPMENT.md` | Windows での初回構築と起動・停止手順 |
+| `requirements.txt` | MkDocs と3つのプラグインのバージョン指定 |
+| `.github/workflows/deploy-pages.yml` | `main` への push で Pages へデプロイ |
+
+`build.log` が残っている場合は `mkdocs build` の出力です。不要なので削除してかまいません
+（Git の追跡対象外です）。
+
+### 履歴の調べ方
+
+| 知りたいこと | 調べ方 |
+| --- | --- |
+| 何が起きたかの要約 | 本ファイルの第8節「経緯」 |
+| マージ済みの変更 | `git log origin/main --oneline`。squash merge のため `... (#15)` の形式で PR 番号が入る |
+| 進行中の作業 | `gh api repos/hide-G/gennai-unofficial-handson/pulls?state=open` |
+| 個別の変更の詳細 | GitHub の PR ページ。PR 本文に変更内容と検証結果を書く運用 |
+
+`git branch --merged` は使えません。squash merge でコミット SHA が変わるため、マージ済みの
+ブランチも未マージと判定されます。ブランチの生死は GitHub の PR 一覧で判断してください。
+
+### 原稿の元資料
+
+第4章・第5章の本文は、スライド資料
+`源内ハンズオン資料-01-源内 Web（AI インターフェース）_マスク済.pdf`（全34ページ）の
+スライド9〜32を元に作成しました。PDF そのものと、そこから抽出した画像・テキストは
+このリポジトリには含まれず、作成者のローカル環境にあります。原稿を書き直す場合は
+元資料の保有者に確認してください。
